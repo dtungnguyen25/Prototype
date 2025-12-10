@@ -36,7 +36,7 @@ public class PlayerShipController : MonoBehaviour
         // We calculate how much to rotate based on input and turn speed.
         // "vertical" rotates around X axis (pitch up/down).
         // "horizontal" rotates around Y axis (turn left/right).
-        Vector3 rotateAmount = new Vector3(vertical, horizontal, 0) * turnSpeed * Time.deltaTime;
+        Vector3 rotateAmount = new Vector3(vertical * -1f, horizontal, 0) * turnSpeed * Time.deltaTime;
 
         // Apply the rotation to the ship
         transform.Rotate(rotateAmount);
