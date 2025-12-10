@@ -154,7 +154,7 @@ MonoBehaviour:
   lifeTime: 5
   damage: 25
   isHoming: 1
-  homingTurnSpeed: 2
+  homingTurnSpeed: 3
   target: {fileID: 1354406600687782382, guid: de7c1c0c014fa6c4691d5972cfa14f07, type: 3}
 --- !u!1 &6993910885905975263
 GameObject:
@@ -233,7 +233,7 @@ TrailRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Time: 5
+  m_Time: 3
   m_PreviewTimeScale: 1
   m_Parameters:
     serializedVersion: 3
