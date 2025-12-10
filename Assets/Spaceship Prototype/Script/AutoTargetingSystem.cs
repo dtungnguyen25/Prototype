@@ -147,7 +147,7 @@ public class AutoTargetingSystem : MonoBehaviour
         float bestDistanceToCenter = Mathf.Infinity;
 
         Collider[] enemies = Physics.OverlapSphere(transform.position, detectionRange, enemyLayer);
-        Vector2 screenCenter = new Vector2(Screen.width / 2, Screen.height / 2);
+        Vector2 screenCenter = new Vector2(Screen.width / 2, Screen.height / 3 * 2); // 2/3 up the screen
 
         foreach (Collider enemy in enemies)
         {

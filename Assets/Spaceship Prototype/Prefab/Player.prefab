@@ -440,6 +440,7 @@ GameObject:
   - component: {fileID: 7834241941380899865}
   - component: {fileID: 377854366203138354}
   - component: {fileID: 4087482056993809510}
+  - component: {fileID: 7825311210385420776}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -548,6 +549,27 @@ MonoBehaviour:
   isPlayer: 1
   respawnDelay: 2
   healthBarFill: {fileID: 1921850342284172043}
+--- !u!65 &7825311210385420776
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5616721525976981407}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2.5374522, y: 0.62128323, z: 2.8396866}
+  m_Center: {x: 0, y: -0.045992166, z: 0.1576873}
 --- !u!1 &7030766263413651895
 GameObject:
   m_ObjectHideFlags: 0

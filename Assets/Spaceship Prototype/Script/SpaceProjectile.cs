@@ -11,10 +11,21 @@ public class SpaceProjectile : MonoBehaviour
     public bool isHoming = false;
     public float homingTurnSpeed = 2f; // How hard it can turn
 
-    private Transform target;
+    [Tooltip("Manually assign target (optional). If empty, script tries to find Player tag.")]
+    public Transform target; 
 
     void Start()
     {
+        // If isHoming is true, but you forgot to assign a target, find the Player automatically.
+        if (isHoming && target == null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                target = playerObj.transform;
+            }
+        }
+
         // Destroy the bullet automatically after 'lifeTime' seconds
         Destroy(gameObject, lifeTime);
     }
@@ -37,10 +48,14 @@ public class SpaceProjectile : MonoBehaviour
             Vector3 direction = (target.position - transform.position).normalized;
 
             // 2. Create the rotation we want to have
-            Quaternion lookRotation = Quaternion.LookRotation(direction);
-
-            // 3. Smoothly rotate towards that rotation
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * homingTurnSpeed);
+            // We use Slerp first to verify we have a valid direction to avoid errors if target is exactly inside us
+            if (direction != Vector3.zero) 
+            {
+                Quaternion lookRotation = Quaternion.LookRotation(direction);
+                
+                // 3. Smoothly rotate towards that rotation
+                transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * homingTurnSpeed);
+            }
         }
 
         // Move forward constantly based on current rotation
@@ -52,13 +67,14 @@ public class SpaceProjectile : MonoBehaviour
         // Check if the object we hit has a HealthSystem
         HealthSystem health = other.GetComponent<HealthSystem>();
 
+        // Optional: specific tag check to avoid hurting the enemy who shot it
+        // if (health != null && !other.CompareTag("Enemy")) 
         if (health != null)
         {
             health.TakeDamage(damage);
         }
 
-        // Destroy bullet on impact (unless it's the player shooting themselves)
-        // Add a tag check here later so you don't shoot yourself!
+        // Destroy bullet on impact
         Destroy(gameObject);
     }
 }
