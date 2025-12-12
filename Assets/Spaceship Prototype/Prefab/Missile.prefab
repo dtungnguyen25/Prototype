@@ -151,11 +151,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speed: 30
-  lifeTime: 5
-  damage: 25
+  lifeTime: 3
+  damage: 10
   isHoming: 1
   homingTurnSpeed: 3
-  target: {fileID: 1354406600687782382, guid: de7c1c0c014fa6c4691d5972cfa14f07, type: 3}
+  target: {fileID: 0}
 --- !u!1 &6993910885905975263
 GameObject:
   m_ObjectHideFlags: 0
@@ -273,7 +273,7 @@ TrailRenderer:
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 1, g: 0.7045615, b: 0, a: 1}
+      key0: {r: 1, g: 0.18057786, b: 0, a: 1}
       key1: {r: 1, g: 1, b: 1, a: 0}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}

@@ -19,6 +19,7 @@ public class EnemySpaceAI : MonoBehaviour
     public float avoidanceDistance = 30f; // If closer than this, fly away
     public float avoidanceTurnSpeed = 5f; // Turn away quickly
     public float fleeSpeed = 25f;         // Speed while running away
+    public float minAvoidanceTime = 3.5f; // Minimum time to spend avoiding
 
     [Header("References")]
     public GameObject projectilePrefab;
@@ -29,9 +30,11 @@ public class EnemySpaceAI : MonoBehaviour
     private float currentSpeed;
     private float targetSpeed;
     private Quaternion targetRotation;
+    private Camera mainCam; // Reference to the camera for the "On Screen" logic
 
     private float moveTimer;
     private float attackTimer;
+    private float avoidanceDurationTimer; // Timer for how long to keep avoiding
     private bool isAttacking = false;
 
     void Start()
@@ -99,17 +102,31 @@ public class EnemySpaceAI : MonoBehaviour
 
     void PickNewMovementValues()
     {
-        // Randomize Speed
         targetSpeed = Random.Range(minSpeed, maxSpeed);
 
-        // Randomize Direction (Point somewhere random inside a sphere)
-        Vector3 randomDirection = Random.insideUnitSphere;
-        // Keep moving generally forward-ish so they don't loop in tight circles constantly
-        randomDirection += transform.forward;
+        // --- NEW LOGIC: 50% Chance to fly into Camera View ---
+        bool stayOnScreen = (Random.value > 0.5f);
 
-        targetRotation = Quaternion.LookRotation(randomDirection);
+        if (stayOnScreen && mainCam != null)
+        {
+            // 1. Pick a random point on the screen (0,0 is bottom-left, 1,1 is top-right)
+            // We use 0.1 to 0.9 to keep them slightly away from the absolute edge
+            Vector3 randomScreenPoint = new Vector3(Random.Range(0.1f, 0.9f), Random.Range(0.1f, 0.9f), Random.Range(20f, 50f)); // Z is distance from camera
 
-        // Reset move timer
+            // 2. Convert that screen point to a world point
+            Vector3 worldPoint = mainCam.ViewportToWorldPoint(randomScreenPoint);
+
+            // 3. Look at that point
+            targetRotation = Quaternion.LookRotation(worldPoint - transform.position);
+        }
+        else
+        {
+            // Old Logic (Standard Randomness)
+            Vector3 randomDirection = Random.insideUnitSphere;
+            randomDirection += transform.forward;
+            targetRotation = Quaternion.LookRotation(randomDirection);
+        }
+
         moveTimer = changeDirectionInterval;
     }
 
@@ -158,32 +175,60 @@ public class EnemySpaceAI : MonoBehaviour
     {
         if (playerTarget == null) return false;
 
-        // 1. Check distance
         float distanceToPlayer = Vector3.Distance(transform.position, playerTarget.position);
+        bool isTooClose = distanceToPlayer <= avoidanceDistance;
 
-        // 2. If we are safe, return 'false' so the normal AI can run
-        if (distanceToPlayer > avoidanceDistance)
+        // 1. If we are too close, RESET the timer to full duration
+        if (isTooClose)
+        {
+            avoidanceDurationTimer = minAvoidanceTime;
+        }
+
+        // 2. If the timer is still running, countdown
+        if (avoidanceDurationTimer > 0)
+        {
+            avoidanceDurationTimer -= Time.deltaTime;
+        }
+
+        // 3. EXIT CONDITION: 
+        // We only stop avoiding if we are far enough away AND the timer has reached 0
+        if (!isTooClose && avoidanceDurationTimer <= 0)
         {
             return false;
         }
 
-        // --- AVOIDANCE LOGIC ---
+        // --- NEW LOGIC: Brake and Turn ---
 
-        // 3. Calculate vector AWAY from player (Me - Player = Direction away)
         Vector3 directionAway = (transform.position - playerTarget.position).normalized;
-
-        // 4. Create rotation looking away
         Quaternion lookAway = Quaternion.LookRotation(directionAway);
 
-        // 5. Smoothly rotate to that direction
+        // 1. Rotate towards the "Away" vector
+        // Slerp ensures it's not a hard snap, but a curve
         transform.rotation = Quaternion.Slerp(transform.rotation, lookAway, Time.deltaTime * avoidanceTurnSpeed);
 
-        // 6. Move forward (usually at a brisk pace)
-        // We blend current speed to fleeSpeed for smoothness
-        currentSpeed = Mathf.Lerp(currentSpeed, fleeSpeed, Time.deltaTime);
+        // 2. Check how much we are facing away
+        // angle == 0 means we are fully facing away. angle == 180 means we are facing the player.
+        float angleToAvoidance = Vector3.Angle(transform.forward, directionAway);
+
+        // 3. Dynamic Speed Control
+        // If we are still facing the player (High Angle), SLOW DOWN to turn tighter.
+        // If we are facing away (Low Angle), BOOST away.
+        float speedMult = 1f;
+        if (angleToAvoidance > 90)
+        {
+            // We are facing the player, brake to turn
+            speedMult = 0.5f;
+        }
+        else
+        {
+            // We are facing away, punch it!
+            speedMult = 1.5f;
+        }
+
+        // Apply the speed logic
+        currentSpeed = Mathf.Lerp(currentSpeed, fleeSpeed * speedMult, Time.deltaTime * 2f);
         transform.Translate(Vector3.forward * currentSpeed * Time.deltaTime);
 
-        // Return 'true' to tell the Update loop "I am busy avoiding, don't do anything else"
         return true;
     }
 }

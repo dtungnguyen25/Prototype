@@ -353,13 +353,14 @@ MonoBehaviour:
   maxSpeed: 15
   rotationSpeed: 10
   changeDirectionInterval: 3
-  attackIntervalMin: 2
-  attackIntervalMax: 8
+  attackIntervalMin: 5
+  attackIntervalMax: 10
   combatTurnSpeed: 2
   shootingAccuracy: 10
-  avoidanceDistance: 5
+  avoidanceDistance: 15
   avoidanceTurnSpeed: 2
   fleeSpeed: 30
+  minAvoidanceTime: 2.5
   projectilePrefab: {fileID: 4627600513725645491, guid: 30107ddadca932d45a48f2bbf7b55aea, type: 3}
   firePoint: {fileID: 4261889942882165502}
   playerTarget: {fileID: 1354406600687782382, guid: de7c1c0c014fa6c4691d5972cfa14f07, type: 3}
