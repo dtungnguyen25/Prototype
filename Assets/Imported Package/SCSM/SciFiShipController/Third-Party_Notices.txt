@@ -1,0 +1,44 @@
+This asset is governed by the Asset Store EULA; however, the following demo components are governed by the license indicated below.
+
+These contain altered CCO content.
+
+Sci-Fi Ship Controller
+ssc_ambient1w.wav
+ssc_ambient2w.wav
+ssc_door1w.wav
+ssc_door2w.wav
+ssc_door3w.wav
+ssc_door4w.wav
+ssc_elevator1w.wav
+ssc_gear1w.wav
+ssc_gear2w.wav
+ssc_gear3w.wav
+ssc_metallic_engage1w.wav
+ssc_metallic_engage2w.wav
+ssc_siren1w.wav
+ssc_ambientfx01w.wav
+ssc_ambientfx02w.wav
+cliff (sandstone).png
+sandalbedo.png
+scsm_door1w.wav
+scsm_engine1w.wav
+scsm_engine2w.wav
+scsm_explosion1w.wav
+scsm_explosion2w.wav
+scsm_explosion3w.wav
+scsm_explosion4w.wav
+scsm_metallic1w.wav
+ssc_laser01w.wav
+ssc_thruster1w.wav
+ssc_thruster2w.wav
+ssc_thruster3w.wav
+ssc_thruster4w.wav
+particlecloudblack.png
+particlecloudwhite.png
+particlefirecloud.png
+spark.png
+SSCUIAim2.png
+SSCUIAim4->17.png
+
+Creative Commons CCO Universal license.
+https://creativecommons.org/publicdomain/zero/1.0/
