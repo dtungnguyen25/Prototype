@@ -17,6 +17,9 @@ public class ShipController : MonoBehaviour
     [Header("Rotation Stats")]
     public float turnSpeed = 5f;          // How fast we turn with Right Stick
     public float autoLevelSpeed = 2f;     // How fast we auto-level to horizon
+    public float autoLevelDelay = 2.0f; // How long to wait (2 seconds)
+    public float maxSpeedForAutoLevel = 10f; // Only auto-level if below this speed
+    private float lastInputTime;        // The timestamp of when we last stopped turning
     
     [Header("Dodge & Energy")]
     public float dodgeForce = 50f;        // Instant force applied when dodging
@@ -135,11 +138,11 @@ public class ShipController : MonoBehaviour
         Vector3 thrustForce = transform.forward * thrustAxis * acceleration;
 
         // 2. Calculate Strafe (Left Stick relative to Camera)
-        // We project the camera's forward and right vectors onto a flat plane so looking down doesn't mess up movement
-        Vector3 camFwd = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+        // We project the camera's up and right vectors onto a flat plane so looking down doesn't mess up movement
+        Vector3 camUp = cameraTransform.up;
         Vector3 camRight = cameraTransform.right;
 
-        Vector3 strafeForce = (camFwd * moveInput.y + camRight * moveInput.x) * acceleration;
+        Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * acceleration;
 
         // 3. Apply Forces
         float speedLimit = isBoosting ? boostSpeed : maxSpeed;
@@ -167,23 +170,44 @@ public class ShipController : MonoBehaviour
         rb.AddRelativeTorque(torque);
     }
 
-    private void HandleStabilization()
-        {
-        // 1. Check if the player is currently rolling/turning. 
-        // CHANGE "Horizontal" to whatever input name you use for turning/rolling!
-        float rotationInput = Input.GetAxis("Horizontal");
+private void HandleStabilization()
+{
+    // 1. Check if we have any rotation input (Using the input variable we set up earlier)
+    // We check .sqrMagnitude because it's faster than .magnitude
+    bool isRotating = lookInput.sqrMagnitude > 0.01f;
 
-        // 2. Only auto-level if input is very small (player let go)
-        if (Mathf.Abs(rotationInput) < 0.1f)
-        {
-            // 3. Create a target rotation: 
-            // "Look in my current forward direction, but keep my head pointing to the sky (Vector3.up)"
-            Quaternion targetRotation = Quaternion.LookRotation(transform.forward, Vector3.up);
+    // 2. Check Speed
+    float currentSpeed = rb.linearVelocity.magnitude;
+    bool isMovingFast = currentSpeed > maxSpeedForAutoLevel;
 
-            // 4. Smoothly interpolate (Slerp) from current rotation to the target rotation
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * autoLevelSpeed);
+    if (isRotating || isMovingFast)
+    {
+        // If we are rotating, reset the "Last Input Time" to right now
+        lastInputTime = Time.time;
+    }
+    else
+    {
+        // 2. We are NOT rotating. Check how much time has passed.
+        float timeSinceInput = Time.time - lastInputTime;
+
+        if (timeSinceInput > autoLevelDelay)
+        {
+            // 3. The Delay is over! Apply Stabilization.
+            
+            // Calculate the rotation needed to align 'up' with 'Vector3.up'
+            Quaternion targetRotation = Quaternion.FromToRotation(transform.up, Vector3.up);
+            
+            targetRotation.ToAngleAxis(out float angle, out Vector3 axis);
+
+            // Normalize angle to handle the -180 to 180 wrap-around
+            if (angle > 180) angle -= 360;
+
+            // Apply the Torque (Physics force) to gently rotate us back
+            // We use the same 'stabilizeSpeed' variable from your stats
+            rb.AddTorque(axis * (angle * autoLevelSpeed * Mathf.Deg2Rad) - rb.angularVelocity);
         }
     }
+}
 
      private void HandleBraking()
     {
@@ -211,16 +235,16 @@ public class ShipController : MonoBehaviour
         if (moveInput.sqrMagnitude > 0.1f)
         {
             // Directional Dodge: Use the same math as Strafe logic
-            Vector3 camFwd = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+            Vector3 camUp = cameraTransform.up;
             Vector3 camRight = cameraTransform.right;
-            dodgeDirection = (camFwd * moveInput.y + camRight * moveInput.x).normalized;
+            dodgeDirection = (camUp * moveInput.y + camRight * moveInput.x).normalized;
         }
         else
         {
             // "Phase/Spot Dodge": If no input, maybe jump UP or Backward? 
             // Let's do a quick backward phase as a defensive maneuver
             // Or you can make this Vector3.zero for just an invincibility frame logic (not physics)
-            dodgeDirection = transform.up; // Spot dodge jumps "Up" relative to ship
+            dodgeDirection = transform.forward; // Spot dodge jumps "Forward" relative to ship
         }
 
         // Apply Impulse (Instant force, ignoring mass)
