@@ -808,7 +808,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 961739749}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.06213744, y: 0.000000028150282, z: -0.0000000017525732, w: 0.9980676}
+  m_LocalRotation: {x: 0.05487107, y: -0.000000012808664, z: 7.038855e-10, w: 0.9984935}
   m_LocalPosition: {x: 0, y: 4.5, z: -113.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1221,20 +1221,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Composition:
-    ScreenPosition: {x: 0, y: 0}
+    ScreenPosition: {x: 0, y: 0.02}
     DeadZone:
       Enabled: 0
-      Size: {x: 0.1, y: 0.1}
+      Size: {x: 0.06563576, y: 0.1}
     HardLimits:
       Enabled: 1
-      Size: {x: 0.5, y: 0.5}
+      Size: {x: 0.12, y: 0.15}
       Offset: {x: 0, y: 0}
-  CenterOnActivate: 0
+  CenterOnActivate: 1
   TargetOffset: {x: 0, y: 0, z: 0}
   Damping: {x: 0.6, y: 0.6}
   Lookahead:
     Enabled: 1
-    Time: 0
+    Time: 0.1
     Smoothing: 0
     IgnoreY: 0
 --- !u!114 &1304348063
@@ -1251,7 +1251,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   TrackerSettings:
     BindingMode: 3
-    PositionDamping: {x: 0.5, y: 0.2, z: 0.5}
+    PositionDamping: {x: 0.5, y: 0.4, z: 0.5}
     AngularDampingMode: 1
     RotationDamping: {x: 1, y: 1, z: 1}
     QuaternionDamping: 0.7
@@ -1307,7 +1307,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1304348060}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.06213744, y: 0.000000028150282, z: -0.000000001752573, w: 0.9980676}
+  m_LocalRotation: {x: 0.05487106, y: -0.0000000128086635, z: 7.038853e-10, w: 0.9984935}
   m_LocalPosition: {x: 0, y: 4.5, z: -113.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1403,14 +1403,6 @@ PrefabInstance:
     - target: {fileID: 4692254130021076421, guid: e28facc43ed3773418ea277a889d0eb2, type: 3}
       propertyPath: m_Name
       value: Player
-      objectReference: {fileID: 0}
-    - target: {fileID: 7380206812269697215, guid: e28facc43ed3773418ea277a889d0eb2, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 22
-      objectReference: {fileID: 0}
-    - target: {fileID: 9188354139177952442, guid: e28facc43ed3773418ea277a889d0eb2, type: 3}
-      propertyPath: turnSpeed
-      value: 3.5
       objectReference: {fileID: 0}
     - target: {fileID: 9188354139177952442, guid: e28facc43ed3773418ea277a889d0eb2, type: 3}
       propertyPath: cameraTransform

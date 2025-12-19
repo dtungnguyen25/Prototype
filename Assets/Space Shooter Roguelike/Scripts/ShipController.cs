@@ -1,3 +1,4 @@
+using NUnit.Framework.Internal.Commands;
 using UnityEngine;
 using UnityEngine.InputSystem; // Required for the New Input System
 
@@ -23,9 +24,12 @@ public class ShipController : MonoBehaviour
     
     [Header("Dodge & Energy")]
     public float dodgeForce = 50f;        // Instant force applied when dodging
+    public float energyPerDodge = 25f;     // Energy cost per dodge
     public float maxEnergy = 100f;        // Total energy for boosting
     public float energyDrainRate = 20f;   // Energy lost per second while boosting
     public float energyRechargeRate = 10f;// Energy gained per second
+    public float energyRechargeDelay = 2.0f; // Delay before recharging starts
+    private float lastEnergyUseTime; // Timestamp of last energy use
     
     // Internal State Flags
     private bool isBoosting = false;
@@ -98,6 +102,7 @@ public class ShipController : MonoBehaviour
     {
         // Handle Energy Logic in Update (Frame-based)
         HandleEnergy();
+        Debug.Log("Current Energy: " + currentEnergy.ToString("F1") );
     }
 
     private void FixedUpdate()
@@ -119,15 +124,20 @@ public class ShipController : MonoBehaviour
     {
         if (isBoosting && currentEnergy > 0)
         {
-            currentEnergy -= energyDrainRate * Time.deltaTime;
+            currentEnergy -= energyDrainRate * Time.deltaTime; // Drain energy
+            lastEnergyUseTime = Time.time; // Update last use time
         }
         else
         {
             // Stop boosting if out of energy
             if (currentEnergy <= 0) isBoosting = false;
             
+            // CHECK: Has enough time passed since we last used energy?
+            if (Time.time > lastEnergyUseTime + energyRechargeDelay)
+            {
             // Recharge
             currentEnergy = Mathf.Clamp(currentEnergy + energyRechargeRate * Time.deltaTime, 0, maxEnergy);
+            }
         }
     }
 
@@ -164,7 +174,7 @@ public class ShipController : MonoBehaviour
         // Simple turning using torque
         // Pitch (Up/Down) rotates around X axis
         // Yaw (Left/Right) rotates around Y axis
-        Vector3 torque = new Vector3(lookInput.y, lookInput.x, 0) * turnSpeed;
+        Vector3 torque = new Vector3(lookInput.y * -1f, lookInput.x, 0) * turnSpeed; // invert Y here if needed
         
         // Use AddRelativeTorque so it rotates based on where the ship is currently facing
         rb.AddRelativeTorque(torque);
@@ -229,6 +239,17 @@ private void HandleStabilization()
 
     private void PerformDodge()
     {
+        // 1. Check if we have enough energy
+    if (currentEnergy < energyPerDodge)
+    {
+        // To be doing: Play a "failed" sound or flash UI here
+        return; 
+    }
+
+        // 2. Pay the cost (Instant deduction)
+        currentEnergy -= energyPerDodge;
+        lastEnergyUseTime = Time.time; // Update last use time
+        
         // "B: Dodge, move fast toward curent input direction"
         Vector3 dodgeDirection;
 
