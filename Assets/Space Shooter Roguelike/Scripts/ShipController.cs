@@ -18,7 +18,8 @@ public class ShipController : MonoBehaviour
     // e.g., currentAcceleration can be changed by a buff without breaking the original asset.
     private float currentAcceleration;
     private float currentMaxSpeed;
-    private float currentBoostSpeed;
+    private float currentMaxBoostSpeed;
+    private float currentBoostForce;
     private float currentBrakeStrength;
     private float currentTurnSpeed;
     private float currentAutoLevelSpeed;
@@ -75,7 +76,8 @@ public class ShipController : MonoBehaviour
         // 1. Copy Movement values to our Runtime variables
         currentAcceleration = stats.acceleration;
         currentMaxSpeed = stats.maxSpeed;
-        currentBoostSpeed = stats.boostSpeed;
+        currentMaxBoostSpeed = stats.maxBoostSpeed;
+        currentBoostForce = stats.boostForce;
         currentBrakeStrength = stats.brakeStrength;
 
         // 2. Copy Rotation values
@@ -178,33 +180,51 @@ public class ShipController : MonoBehaviour
         }
     }
 
-    private void HandleMovement()
+private void HandleMovement()
+{
+    // 1. Calculate Standard Thrust (Input based)
+    float thrustAxis = thrustForwardInput - thrustBackwardInput;
+    Vector3 inputThrust = transform.forward * thrustAxis * currentAcceleration;
+
+    // 2. Calculate Strafe (Input based)
+    Vector3 camUp = cameraTransform.up;
+    Vector3 camRight = cameraTransform.right;
+    
+    // Flatten camera vectors so looking down doesn't push us into the ground unexpectedly
+    // (Optional, but good for space shooters if you want "flat" strafing relative to view)
+    // Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * currentAcceleration; 
+    
+    // Your original strafe logic:
+    Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * currentAcceleration;
+
+    // 3. Apply Input Forces
+    // We apply these regardless of boosting. This lets you "steer" or "fight" the boost slightly.
+    rb.AddForce(inputThrust + strafeForce);
+
+    // 4. Handle Boosting (The New Logic)
+    float speedLimit = currentMaxSpeed; // Default limit
+
+    if (isBoosting)
     {
-        // 1. Calculate Thrust (LT - LB)
-        float thrustAxis = thrustForwardInput - thrustBackwardInput;
-        Vector3 thrustForce = transform.forward * thrustAxis * currentAcceleration;
+        // A. Set the higher speed limit
+        speedLimit = currentMaxBoostSpeed;
 
-        // 2. Calculate Strafe (Left Stick relative to Camera)
-        // We project the camera's up and right vectors onto a flat plane so looking down doesn't mess up movement
-        Vector3 camUp = cameraTransform.up;
-        Vector3 camRight = cameraTransform.right;
-
-        Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * currentAcceleration;
-
-        // 3. Apply Forces
-        float speedLimit = isBoosting ? currentBoostSpeed : currentMaxSpeed;
+        // B. Apply CONSTANT forward force
+        // This runs even if 'thrustAxis' is 0. 
+        // Note: I used 'currentAcceleration' here, but you might want to create a 
+        // dedicated 'boostForce' variable in your Stats to make it punchier.
+        Vector3 constantBoostForce = transform.forward * currentBoostForce; 
         
-        // If boosting, we multiply the force
-        float boostMultiplier = isBoosting ? 2f : 1f;
-
-        rb.AddForce((thrustForce + strafeForce) * boostMultiplier);
-
-        // 4. Cap Speed (Soft cap)
-        if (rb.linearVelocity.magnitude > speedLimit)
-        {
-            rb.linearVelocity = rb.linearVelocity.normalized * speedLimit;
-        }
+        rb.AddForce(constantBoostForce);
     }
+
+    // 5. Cap Speed (Soft cap)
+    // We use linearVelocity (Unity 6+) or velocity (Unity 5/2022)
+    if (rb.linearVelocity.magnitude > speedLimit)
+    {
+        rb.linearVelocity = rb.linearVelocity.normalized * speedLimit;
+    }
+}
 
     private void HandleRotation()
     {

@@ -7,7 +7,8 @@ public class ShipStats : ScriptableObject // 2. Inheritance
     [Header("Movement Stats")]
     public float acceleration = 200f;
     public float maxSpeed = 70f;
-    public float boostSpeed = 200f;
+    public float maxBoostSpeed = 200f;
+    public float boostForce = 600f;
     public float brakeStrength = 5f;
 
     [Header("Rotation Stats")]

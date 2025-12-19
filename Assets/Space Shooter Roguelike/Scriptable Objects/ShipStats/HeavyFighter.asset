@@ -14,8 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   acceleration: 80
   maxSpeed: 50
-  boostSpeed: 150
-  brakeStrength: 5
+  maxBoostSpeed: 200
+  boostForce: 400
+  brakeStrength: 0.8
   turnSpeed: 2
   autoLevelSpeed: 0.5
   autoLevelDelay: 2
