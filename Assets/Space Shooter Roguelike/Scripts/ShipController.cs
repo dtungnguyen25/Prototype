@@ -9,38 +9,40 @@ public class ShipController : MonoBehaviour
     [Tooltip("The camera the ship moves relative to.")]
     public Transform cameraTransform;
 
-    [Header("Movement Stats")]
-    public float acceleration = 40f;      // How fast we speed up
-    public float maxSpeed = 20f;          // Normal top speed
-    public float boostSpeed = 40f;        // Top speed while boosting
-    public float brakeStrength = 5f;      // How fast the support brake stops us
-    
-    [Header("Rotation Stats")]
-    public float turnSpeed = 5f;          // How fast we turn with Right Stick
-    public float autoLevelSpeed = 2f;     // How fast we auto-level to horizon
-    public float autoLevelDelay = 2.0f; // How long to wait (2 seconds)
-    public float maxSpeedForAutoLevel = 10f; // Only auto-level if below this speed
-    private float lastInputTime;        // The timestamp of when we last stopped turning
-    
-    [Header("Dodge & Energy")]
-    public float dodgeForce = 50f;        // Instant force applied when dodging
-    public float energyPerDodge = 25f;     // Energy cost per dodge
-    public float maxEnergy = 100f;        // Total energy for boosting
-    public float energyDrainRate = 20f;   // Energy lost per second while boosting
-    public float energyRechargeRate = 10f;// Energy gained per second
-    public float energyRechargeDelay = 2.0f; // Delay before recharging starts
-    private float lastEnergyUseTime; // Timestamp of last energy use
+    [Header("Configuration")]
+    // This is where you drag in your "LightShip", "HeavyShip", etc.
+    public ShipStats currentShipStats; 
+
+    // --- RUNTIME VARIABLES (Hidden from Inspector) ---
+    // We use these for actual physics. This prepares you for modifiers.
+    // e.g., currentAcceleration can be changed by a buff without breaking the original asset.
+    private float currentAcceleration;
+    private float currentMaxSpeed;
+    private float currentBoostSpeed;
+    private float currentBrakeStrength;
+    private float currentTurnSpeed;
+    private float currentAutoLevelSpeed;
+    private float currentAutoLevelDelay;
+    private float currentMaxSpeedForAutoLevel;
+    private float currentDodgeForce;
+    private float currentEnergyPerDodge;
+    private float currentMaxEnergy;
+    private float currentEnergyDrainRate;
+    private float currentEnergyRechargeRate;
+    private float currentEnergyRechargeDelay;
     
     // Internal State Flags
     private bool isBoosting = false;
     private bool isBrakingEnabled = true; // Can be disabled later for damage effects
     private float currentEnergy;
+    private float lastEnergyUseTime; // Timestamp of last energy use
 
     // Input Storage
     private Vector2 moveInput;
     private Vector2 lookInput;
     private float thrustForwardInput;
     private float thrustBackwardInput;
+    private float lastInputTime; // For auto-leveling
 
     // Component References
     private Rigidbody rb;
@@ -54,7 +56,42 @@ public class ShipController : MonoBehaviour
         rb.linearDamping = 1f; 
         rb.angularDamping = 2f;
 
-        currentEnergy = maxEnergy;
+        // Initialize the ship with the stats assigned in the inspector
+        if (currentShipStats != null)
+        {
+            LoadShipStats(currentShipStats);
+        }
+
+        currentEnergy = currentMaxEnergy;
+
+    }
+    /// <summary>
+    /// Call this method to switch ships or reset stats.
+    /// It copies values from the Asset (Read-Only) to the Controller (Modifiable).
+    /// </summary>
+    public void LoadShipStats(ShipStats stats)
+    {
+
+        // 1. Copy Movement values to our Runtime variables
+        currentAcceleration = stats.acceleration;
+        currentMaxSpeed = stats.maxSpeed;
+        currentBoostSpeed = stats.boostSpeed;
+        currentBrakeStrength = stats.brakeStrength;
+
+        // 2. Copy Rotation values
+        currentTurnSpeed = stats.turnSpeed;
+        currentAutoLevelSpeed = stats.autoLevelSpeed;
+        currentAutoLevelDelay = stats.autoLevelDelay;
+        currentMaxSpeedForAutoLevel = stats.maxSpeedForAutoLevel;
+
+        // 3. Copy Ability values
+        currentDodgeForce = stats.dodgeForce;
+        currentEnergyPerDodge = stats.energyPerDodge;
+        currentMaxEnergy = stats.maxEnergy;
+        currentEnergyDrainRate = stats.energyDrainRate;
+        currentEnergyRechargeRate = stats.energyRechargeRate;
+        currentEnergyRechargeDelay = stats.energyRechargeDelay;
+
     }
 
     #region Input Handling
@@ -124,7 +161,7 @@ public class ShipController : MonoBehaviour
     {
         if (isBoosting && currentEnergy > 0)
         {
-            currentEnergy -= energyDrainRate * Time.deltaTime; // Drain energy
+            currentEnergy -= currentEnergyDrainRate * Time.deltaTime; // Drain energy
             lastEnergyUseTime = Time.time; // Update last use time
         }
         else
@@ -133,10 +170,10 @@ public class ShipController : MonoBehaviour
             if (currentEnergy <= 0) isBoosting = false;
             
             // CHECK: Has enough time passed since we last used energy?
-            if (Time.time > lastEnergyUseTime + energyRechargeDelay)
+            if (Time.time > lastEnergyUseTime + currentEnergyRechargeDelay)
             {
             // Recharge
-            currentEnergy = Mathf.Clamp(currentEnergy + energyRechargeRate * Time.deltaTime, 0, maxEnergy);
+            currentEnergy = Mathf.Clamp(currentEnergy + currentEnergyRechargeRate * Time.deltaTime, 0, currentMaxEnergy);
             }
         }
     }
@@ -145,17 +182,17 @@ public class ShipController : MonoBehaviour
     {
         // 1. Calculate Thrust (LT - LB)
         float thrustAxis = thrustForwardInput - thrustBackwardInput;
-        Vector3 thrustForce = transform.forward * thrustAxis * acceleration;
+        Vector3 thrustForce = transform.forward * thrustAxis * currentAcceleration;
 
         // 2. Calculate Strafe (Left Stick relative to Camera)
         // We project the camera's up and right vectors onto a flat plane so looking down doesn't mess up movement
         Vector3 camUp = cameraTransform.up;
         Vector3 camRight = cameraTransform.right;
 
-        Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * acceleration;
+        Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * currentAcceleration;
 
         // 3. Apply Forces
-        float speedLimit = isBoosting ? boostSpeed : maxSpeed;
+        float speedLimit = isBoosting ? currentBoostSpeed : currentMaxSpeed;
         
         // If boosting, we multiply the force
         float boostMultiplier = isBoosting ? 2f : 1f;
@@ -174,7 +211,7 @@ public class ShipController : MonoBehaviour
         // Simple turning using torque
         // Pitch (Up/Down) rotates around X axis
         // Yaw (Left/Right) rotates around Y axis
-        Vector3 torque = new Vector3(lookInput.y * -1f, lookInput.x, 0) * turnSpeed; // invert Y here if needed
+        Vector3 torque = new Vector3(lookInput.y * -1f, lookInput.x, 0) * currentTurnSpeed; // invert Y here if needed
         
         // Use AddRelativeTorque so it rotates based on where the ship is currently facing
         rb.AddRelativeTorque(torque);
@@ -188,7 +225,7 @@ private void HandleStabilization()
 
     // 2. Check Speed
     float currentSpeed = rb.linearVelocity.magnitude;
-    bool isMovingFast = currentSpeed > maxSpeedForAutoLevel;
+    bool isMovingFast = currentSpeed > currentMaxSpeedForAutoLevel;
 
     if (isRotating || isMovingFast)
     {
@@ -200,7 +237,7 @@ private void HandleStabilization()
         // 2. We are NOT rotating. Check how much time has passed.
         float timeSinceInput = Time.time - lastInputTime;
 
-        if (timeSinceInput > autoLevelDelay)
+        if (timeSinceInput > currentAutoLevelDelay)
         {
             // 3. The Delay is over! Apply Stabilization.
             
@@ -214,7 +251,7 @@ private void HandleStabilization()
 
             // Apply the Torque (Physics force) to gently rotate us back
             // We use the same 'stabilizeSpeed' variable from your stats
-            rb.AddTorque(axis * (angle * autoLevelSpeed * Mathf.Deg2Rad) - rb.angularVelocity);
+            rb.AddTorque(axis * (angle * currentAutoLevelSpeed * Mathf.Deg2Rad) - rb.angularVelocity);
         }
     }
 }
@@ -227,12 +264,12 @@ private void HandleStabilization()
         if (noInput)
         {
             // Interpolate velocity towards zero
-            rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, Vector3.zero, brakeStrength * Time.fixedDeltaTime);
+            rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, Vector3.zero, currentBrakeStrength * Time.fixedDeltaTime);
             
             // Also kill rotation if joystick is let go
             if(lookInput.sqrMagnitude < 0.1f)
             {
-                rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, brakeStrength * Time.fixedDeltaTime);
+                rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, currentBrakeStrength * Time.fixedDeltaTime);
             }
         }
     }
@@ -240,14 +277,14 @@ private void HandleStabilization()
     private void PerformDodge()
     {
         // 1. Check if we have enough energy
-    if (currentEnergy < energyPerDodge)
+    if (currentEnergy < currentEnergyPerDodge)
     {
         // To be doing: Play a "failed" sound or flash UI here
         return; 
     }
 
         // 2. Pay the cost (Instant deduction)
-        currentEnergy -= energyPerDodge;
+        currentEnergy -= currentEnergyPerDodge;
         lastEnergyUseTime = Time.time; // Update last use time
         
         // "B: Dodge, move fast toward curent input direction"
@@ -269,7 +306,7 @@ private void HandleStabilization()
         }
 
         // Apply Impulse (Instant force, ignoring mass)
-        rb.AddForce(dodgeDirection * dodgeForce, ForceMode.Impulse);
+        rb.AddForce(dodgeDirection * currentDodgeForce, ForceMode.Impulse);
     }
     
     // Method to handle Explosions (Call this from your Bomb/Explosion script)

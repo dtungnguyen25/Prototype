@@ -109,20 +109,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cameraTransform: {fileID: 0}
-  acceleration: 200
-  maxSpeed: 70
-  boostSpeed: 200
-  brakeStrength: 5
-  turnSpeed: 3.5
-  autoLevelSpeed: 0.5
-  autoLevelDelay: 2
-  maxSpeedForAutoLevel: 10
-  dodgeForce: 300
-  energyPerDodge: 25
-  maxEnergy: 100
-  energyDrainRate: 20
-  energyRechargeRate: 10
-  energyRechargeDelay: 2
+  currentShipStats: {fileID: 11400000, guid: 6f0ec6dc3a34c1542aa7f2089ee17c52, type: 2}
 --- !u!114 &4169734540850752355
 MonoBehaviour:
   m_ObjectHideFlags: 0

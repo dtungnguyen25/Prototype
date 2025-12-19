@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81f6235b09c3cd74c965ac12a8e1fada, type: 3}
+  m_Name: HeavyFighter
+  m_EditorClassIdentifier: 
+  acceleration: 80
+  maxSpeed: 50
+  boostSpeed: 150
+  brakeStrength: 5
+  turnSpeed: 2
+  autoLevelSpeed: 0.5
+  autoLevelDelay: 2
+  maxSpeedForAutoLevel: 10
+  dodgeForce: 250
+  energyPerDodge: 40
+  maxEnergy: 100
+  energyDrainRate: 15
+  energyRechargeRate: 20
+  energyRechargeDelay: 2
