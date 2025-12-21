@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2049ece9fd660c74baa01c4195d2268c, type: 3}
+  m_Name: StandardGatlinggGun
+  m_EditorClassIdentifier: 
+  TriggerMode: 0
+  FireRate: 5
+  ProjectlilesCount: 10
+  SpreadAngle: 1
+  BurstCount: 3
+  BurstDelay: 0.05
+  ChargeTime: 1
+  ProjectilePrefab: {fileID: 7855115645376301421, guid: b0a52c17de45f4b4681e0dfe7da0eff2, type: 3}
+  ProjectileSpeed: 100
+  LockOnTimeNeeded: 1
+  MaxLockDistance: 100
+  MaxLockTargets: 1
+  AssistConeAngle: 5
+  IsHoming: 0
+  HomingTurnSpeed: 60
+  PierceCount: 0
+  ProximityRadius: 0
+  ExplosionRadius: 0
+  ExplosionForce: 0
+  CritChance: 15
+  CritMultiplier: 2
+  DamageStats:
+    PhysicalDamage: 10
+    EnergyDamage: 10
+    ShieldPenetration: 0
+    ArmorPenetration: 0
+    DamageToShieldsMultiplier: 0
+    DamageToArmorMultiplier: 0
+    ImpactForce: 0
+    IsCritical: 0
+    Source: {fileID: 0}
+    HitPoint: {x: 0, y: 0, z: 0}

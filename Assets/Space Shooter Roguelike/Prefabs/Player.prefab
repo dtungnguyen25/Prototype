@@ -44,6 +44,8 @@ GameObject:
   - component: {fileID: 3382002683869234485}
   - component: {fileID: 9188354139177952442}
   - component: {fileID: 4169734540850752355}
+  - component: {fileID: 1382685743544023253}
+  - component: {fileID: 2482456434332925929}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -67,6 +69,7 @@ Transform:
   - {fileID: 8762110003318664535}
   - {fileID: 7380206812269697215}
   - {fileID: 5455050998176898584}
+  - {fileID: 8672191497845628013}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &3382002683869234485
@@ -110,6 +113,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cameraTransform: {fileID: 0}
   currentShipStats: {fileID: 11400000, guid: 6f0ec6dc3a34c1542aa7f2089ee17c52, type: 2}
+  primaryWeapon: {fileID: 2482456434332925929}
+  secondaryWeapon: {fileID: 2482456434332925929}
 --- !u!114 &4169734540850752355
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -231,11 +236,83 @@ MonoBehaviour:
         m_CallState: 2
     m_ActionId: 5c9a9776-05c9-412b-886d-efd9f7784c0d
     m_ActionName: 'Gameplay/Dodge[/XInputControllerWindows/buttonEast]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 9188354139177952442}
+        m_TargetAssemblyTypeName: ShipController, Assembly-CSharp
+        m_MethodName: OnFirePrimary
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: 89911747-10c6-43ab-b1fd-cf508ff58611
+    m_ActionName: 'Gameplay/FirePrimary[/XInputControllerWindows/rightTrigger]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 9188354139177952442}
+        m_TargetAssemblyTypeName: ShipController, Assembly-CSharp
+        m_MethodName: OnFireSecondary
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: 277f2aa4-1180-4dbb-9480-14134da99d64
+    m_ActionName: 'Gameplay/FireSecondary[/XInputControllerWindows/rightShoulder]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Gameplay
   m_SplitScreenIndex: -1
   m_Camera: {fileID: 0}
+--- !u!114 &1382685743544023253
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4692254130021076421}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 643e9c6869eadf041abcd0d944de937f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  shipStats: {fileID: 11400000, guid: 6f0ec6dc3a34c1542aa7f2089ee17c52, type: 2}
+  MaxShield: 100
+  ShieldRegenRate: 5
+  ShieldRegenDelay: 3
+  ShieldPhysicalIntake: 0.2
+  MaxArmor: 100
+  ArmorDamageIntake: 0.4
+  MaxHealth: 100
+  HealthEnergyIntake: 0.5
+--- !u!114 &2482456434332925929
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4692254130021076421}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f90db4ca9f7b59e418a28e64d7453832, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  data: {fileID: 11400000, guid: 639355fe5b6313c4fb3c18b99b11dd76, type: 2}
+  MuzzlePoint: {fileID: 8672191497845628013}
+  MainCamera: {fileID: 0}
+  EnemyLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  AimingObject: {fileID: 1735583588165133318}
 --- !u!1 &4838341675853744985
 GameObject:
   m_ObjectHideFlags: 0
@@ -470,6 +547,37 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &7178766918419263563
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8672191497845628013}
+  m_Layer: 0
+  m_Name: Muzzle Point
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8672191497845628013
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7178766918419263563}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 2.65}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2965141935542237404}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &8762110003318604201
 PrefabInstance:
   m_ObjectHideFlags: 0

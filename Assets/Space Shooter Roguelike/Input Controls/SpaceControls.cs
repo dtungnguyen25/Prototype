@@ -145,6 +145,24 @@ public partial class @SpaceControls: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""FirePrimary"",
+                    ""type"": ""Button"",
+                    ""id"": ""89911747-10c6-43ab-b1fd-cf508ff58611"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""FireSecondary"",
+                    ""type"": ""Button"",
+                    ""id"": ""277f2aa4-1180-4dbb-9480-14134da99d64"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -213,6 +231,28 @@ public partial class @SpaceControls: IInputActionCollection2, IDisposable
                     ""action"": ""Dodge"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c184caf4-73a0-4a5c-81f9-fc8c44181a65"",
+                    ""path"": ""<Gamepad>/rightTrigger"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""FirePrimary"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5ee1d832-82d2-4f49-81e5-20bacdf61a1d"",
+                    ""path"": ""<Gamepad>/rightShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""FireSecondary"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -227,6 +267,8 @@ public partial class @SpaceControls: IInputActionCollection2, IDisposable
         m_Gameplay_ThrustBackward = m_Gameplay.FindAction("ThrustBackward", throwIfNotFound: true);
         m_Gameplay_Boost = m_Gameplay.FindAction("Boost", throwIfNotFound: true);
         m_Gameplay_Dodge = m_Gameplay.FindAction("Dodge", throwIfNotFound: true);
+        m_Gameplay_FirePrimary = m_Gameplay.FindAction("FirePrimary", throwIfNotFound: true);
+        m_Gameplay_FireSecondary = m_Gameplay.FindAction("FireSecondary", throwIfNotFound: true);
     }
 
     ~@SpaceControls()
@@ -313,6 +355,8 @@ public partial class @SpaceControls: IInputActionCollection2, IDisposable
     private readonly InputAction m_Gameplay_ThrustBackward;
     private readonly InputAction m_Gameplay_Boost;
     private readonly InputAction m_Gameplay_Dodge;
+    private readonly InputAction m_Gameplay_FirePrimary;
+    private readonly InputAction m_Gameplay_FireSecondary;
     /// <summary>
     /// Provides access to input actions defined in input action map "Gameplay".
     /// </summary>
@@ -348,6 +392,14 @@ public partial class @SpaceControls: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Gameplay/Dodge".
         /// </summary>
         public InputAction @Dodge => m_Wrapper.m_Gameplay_Dodge;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/FirePrimary".
+        /// </summary>
+        public InputAction @FirePrimary => m_Wrapper.m_Gameplay_FirePrimary;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/FireSecondary".
+        /// </summary>
+        public InputAction @FireSecondary => m_Wrapper.m_Gameplay_FireSecondary;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -392,6 +444,12 @@ public partial class @SpaceControls: IInputActionCollection2, IDisposable
             @Dodge.started += instance.OnDodge;
             @Dodge.performed += instance.OnDodge;
             @Dodge.canceled += instance.OnDodge;
+            @FirePrimary.started += instance.OnFirePrimary;
+            @FirePrimary.performed += instance.OnFirePrimary;
+            @FirePrimary.canceled += instance.OnFirePrimary;
+            @FireSecondary.started += instance.OnFireSecondary;
+            @FireSecondary.performed += instance.OnFireSecondary;
+            @FireSecondary.canceled += instance.OnFireSecondary;
         }
 
         /// <summary>
@@ -421,6 +479,12 @@ public partial class @SpaceControls: IInputActionCollection2, IDisposable
             @Dodge.started -= instance.OnDodge;
             @Dodge.performed -= instance.OnDodge;
             @Dodge.canceled -= instance.OnDodge;
+            @FirePrimary.started -= instance.OnFirePrimary;
+            @FirePrimary.performed -= instance.OnFirePrimary;
+            @FirePrimary.canceled -= instance.OnFirePrimary;
+            @FireSecondary.started -= instance.OnFireSecondary;
+            @FireSecondary.performed -= instance.OnFireSecondary;
+            @FireSecondary.canceled -= instance.OnFireSecondary;
         }
 
         /// <summary>
@@ -503,5 +567,19 @@ public partial class @SpaceControls: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnDodge(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "FirePrimary" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnFirePrimary(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "FireSecondary" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnFireSecondary(InputAction.CallbackContext context);
     }
 }

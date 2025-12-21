@@ -24,4 +24,21 @@ public class ShipStats : ScriptableObject // 2. Inheritance
     public float energyDrainRate = 20f;
     public float energyRechargeRate = 10f;
     public float energyRechargeDelay = 2.0f;
+
+    // --- NEW SECTION ---
+    [Header("Defensive Stats")]
+    
+    // Shield
+    public float maxShield = 100f;
+    public float shieldRegenRate = 5f;
+    public float shieldRegenDelay = 3f;
+    [Range(0f, 1f)] public float shieldPhysicalIntake = 0.5f;
+
+    // Armor
+    public float maxArmor = 100f;
+    [Range(0f, 1f)] public float armorDamageIntake = 0.7f;
+
+    // Health
+    public float maxHealth = 100f;
+    [Range(0f, 1f)] public float healthEnergyIntake = 0.5f;
 }

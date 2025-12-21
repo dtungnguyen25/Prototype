@@ -13,6 +13,12 @@ public class ShipController : MonoBehaviour
     // This is where you drag in your "LightShip", "HeavyShip", etc.
     public ShipStats currentShipStats; 
 
+    [Header("Weapons")]
+    [Tooltip("Drag the WeaponController for your Main Gun (RT) here.")]
+    public WeaponController primaryWeapon;
+    [Tooltip("Drag the WeaponController for your Missiles/Bombs (RB) here.")]
+    public WeaponController secondaryWeapon;
+
     // --- RUNTIME VARIABLES (Hidden from Inspector) ---
     // We use these for actual physics. This prepares you for modifiers.
     // e.g., currentAcceleration can be changed by a buff without breaking the original asset.
@@ -135,13 +141,45 @@ public class ShipController : MonoBehaviour
             PerformDodge();
         }
     }
+
+    // --- NEW WEAPON INPUTS ---
+    
+    // Link "FirePrimary" (RT) to this event
+    public void OnFirePrimary(InputAction.CallbackContext context)
+    {
+        if (primaryWeapon == null) return;
+
+        if (context.performed) // Trigger squeezed
+        {
+            primaryWeapon.StartFiring();
+        }
+        if (context.canceled) // Trigger released
+        {
+            primaryWeapon.StopFiring();
+        }
+    }
+
+    // Link "FireSecondary" (RB) to this event
+    public void OnFireSecondary(InputAction.CallbackContext context)
+    {
+        if (secondaryWeapon == null) return;
+
+        if (context.started) // Button pressed
+        {
+            secondaryWeapon.StartFiring();
+        }
+        if (context.canceled) // Button released
+        {
+            secondaryWeapon.StopFiring();
+        }
+    }
     #endregion
 
     private void Update()
     {
         // Handle Energy Logic in Update (Frame-based)
         HandleEnergy();
-        Debug.Log("Current Energy: " + currentEnergy.ToString("F1") );
+        //Debug.Log("Current Energy: " + currentEnergy.ToString("F1") );
     }
 
     private void FixedUpdate()
