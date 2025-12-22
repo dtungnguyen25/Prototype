@@ -1,12 +1,13 @@
 using UnityEngine;
 
-public enum TriggerType { SemiAuto, FullAuto, Burst, ChargeToFire }
+public enum TriggerType { SemiAuto, FullAuto, ChargeToFire }
 
 [CreateAssetMenu(fileName = "New Weapon Config", menuName = "Weapon/Weapon Config")]
 public class WeaponData : ScriptableObject
 {
     [Header("Firing Logic")]
     public TriggerType TriggerMode;
+    public bool IsBurstFire = false;
     public float FireRate = 5f; // Shots per second
     public int ProjectlilesCount = 1; // Number of projectiles per shot
     public float SpreadAngle = 0f; // Degrees of random spread

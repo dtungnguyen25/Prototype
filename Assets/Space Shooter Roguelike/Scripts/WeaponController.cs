@@ -113,7 +113,7 @@ public class WeaponController : MonoBehaviour
         // Set the cooldown for the NEXT shot
         nextFireTime = Time.time + (1f / data.FireRate);
 
-        if (data.TriggerMode == TriggerType.Burst)
+        if (data.IsBurstFire == true)
         {
             StartCoroutine(PerformBurst());
         }
