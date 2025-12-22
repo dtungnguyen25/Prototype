@@ -111,7 +111,7 @@ public class WeaponController : MonoBehaviour
         if (Time.time < nextFireTime) return;
 
         // Set the cooldown for the NEXT shot
-        nextFireTime = Time.time + (1f / data.FireRate);
+        nextFireTime = Time.time + (1f / data.FireRate); // FireRate is shots per second
 
         if (data.IsBurstFire == true)
         {
@@ -359,10 +359,10 @@ private void HandleTargetingSystem()
         {
             if (t == null || t.transform == null) continue;
 
-            // Yellow = Acquiring, Red = Locked, Green = Primary
+            // Green = Primary, Yellow = Locked, Red = Acquiring
             if (t == primaryTarget) Gizmos.color = Color.green;
-            else if (t.isLocked) Gizmos.color = Color.red;
-            else Gizmos.color = Color.yellow;
+            else if (t.isLocked) Gizmos.color = Color.yellow;
+            else Gizmos.color = Color.red;
 
             Gizmos.DrawWireSphere(t.predictedPos, 1f);
             Gizmos.DrawLine(t.transform.position, t.predictedPos);
