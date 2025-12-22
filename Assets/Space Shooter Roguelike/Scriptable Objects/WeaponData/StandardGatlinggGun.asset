@@ -13,11 +13,12 @@ MonoBehaviour:
   m_Name: StandardGatlinggGun
   m_EditorClassIdentifier: 
   TriggerMode: 0
+  IsBurstFire: 1
   FireRate: 5
   ProjectlilesCount: 10
   SpreadAngle: 1
   BurstCount: 3
-  BurstDelay: 0.05
+  BurstDelay: 0.2
   ChargeTime: 1
   ProjectilePrefab: {fileID: 7855115645376301421, guid: b0a52c17de45f4b4681e0dfe7da0eff2, type: 3}
   ProjectileSpeed: 100
