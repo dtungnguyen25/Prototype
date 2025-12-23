@@ -86,8 +86,8 @@ public class WeaponController : MonoBehaviour
         public bool isLocked;
     }
 
-    private List<TargetTrackData> activeTargets = new List<TargetTrackData>();
-    private TargetTrackData primaryTarget;
+    private List<TargetTrackData> activeTargets = new List<TargetTrackData>(); //All tracked targets
+    private List<TargetTrackData> primaryTargets = new List<TargetTrackData>(); //For multi-lock
 
     // ========================================================================
     // UNITY LIFECYCLE
@@ -456,23 +456,23 @@ public class WeaponController : MonoBehaviour
     // SHOT EXECUTION
     // ========================================================================
 
-private void ExecuteShot()
+    private void ExecuteShot()
     {
         // Single target vs Multi-target logic
         if (data.MaxLockTargets == 1)
         {
             // Standard weapon: Fire at primary target or straight ahead
-            ProcessFire(primaryTarget);
+            ProcessFire(primaryTargets.FirstOrDefault());
         }
         else
         {
             // Multi-lock weapon: Fire at all locked targets
-            var readyTargets = activeTargets.Where(t => t.isLocked).ToList();
+            var lockedTargets = primaryTargets.Where(t => t.isLocked).ToList(); 
 
-            if (readyTargets.Count > 0)
+            if (lockedTargets.Count > 0)
             {
                 // Fire at each locked target
-                foreach (var targetData in readyTargets)
+                foreach (var targetData in lockedTargets)
                 {
                     ProcessFire(targetData);
                 }
@@ -939,21 +939,25 @@ private void ExecuteShot()
         }
 
         // 4. Find primary target (closest to crosshair)
-        primaryTarget = null;
-        float bestAngle = data.AssistConeAngle * 2;
-        Vector3 aimDirection = (AimingObject.position - MainCamera.transform.position).normalized;
+        primaryTargets.Clear(); // Clear previous primary targets
+        
+        Vector3 aimOrigin = MainCamera.transform.position; // Camera position
+        Vector3 aimForward = (AimingObject.position - aimOrigin).normalized; // Aim direction
 
-        foreach (var tData in activeTargets)
-        {
-            Vector3 dirToTarget = (tData.transform.position - MainCamera.transform.position).normalized;
-            float angleFromCrosshair = Vector3.Angle(aimDirection, dirToTarget);
+        // Use LINQ to sort targets by how close they are to center screen (Angle)
+        // We only take targets that are within the AssistConeAngle
+        var sortedTargets = activeTargets
+            .Select(t => new { 
+                Target = t, 
+                Angle = Vector3.Angle(aimForward, (t.transform.position - aimOrigin).normalized) 
+            })
+            .Where(x => x.Angle < data.AssistConeAngle) // Only consider targets inside the cone
+            .OrderBy(x => x.Angle) // Closest to center first
+            .Take(data.MaxLockTargets) // Take only the amount allowed by WeaponData
+            .Select(x => x.Target)
+            .ToList();
 
-            if (angleFromCrosshair < bestAngle)
-            {
-                bestAngle = angleFromCrosshair;
-                primaryTarget = tData;
-            }
-        }
+        primaryTargets.AddRange(sortedTargets);
     }
 
     // ========================================================================
@@ -983,7 +987,7 @@ private void ExecuteShot()
             if (t == null || t.transform == null) continue;
 
             // Color code: Green = Primary, Red = Locked, Yellow = Acquiring
-            if (t == primaryTarget)
+            if (primaryTargets.Contains(t))
                 Gizmos.color = Color.green;
             else if (t.isLocked)
                 Gizmos.color = Color.red;

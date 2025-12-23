@@ -10,43 +10,43 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2049ece9fd660c74baa01c4195d2268c, type: 3}
-  m_Name: StandardGatlinggGun
+  m_Name: StandardHomingMissle
   m_EditorClassIdentifier: 
-  TriggerMode: 2
+  TriggerMode: 0
   FiringMethod: 0
   IsBurstFire: 0
-  FireRate: 7
+  FireRate: 1
   ProjectlilesCount: 1
   SpreadAngle: 0
   BurstCount: 3
-  BurstDelay: 0.05
-  chargeStyle: 3
-  ChargeTime: 2
+  BurstDelay: 0.1
+  chargeStyle: 0
+  ChargeTime: 1
   HoldToChargeIndefinitely: 0
-  ProjectileSpeed: 100
+  ProjectileSpeed: 50
   ProjectileLifetime: 10
-  ProjectilePrefab: {fileID: 7855115645376301421, guid: b0a52c17de45f4b4681e0dfe7da0eff2, type: 3}
+  ProjectilePrefab: {fileID: 7855115645376301421, guid: eb8bdb8d1f7c7fb40998102609c7c67f, type: 3}
   ammoSystem: 0
-  MaxAmmo: 100
-  CurrentAmmo: 100
+  MaxAmmo: 5
+  CurrentAmmo: 5
   ReloadTime: 5
   HeatPerShot: 10
   CooldownRate: 20
   OverheatPenaltyTime: 3
   LockOnTimeNeeded: 1
-  MaxLockDistance: 100
+  MaxLockDistance: 200
   MaxLockTargets: 1
   AssistConeAngle: 5
-  IsHoming: 0
-  HomingTurnSpeed: 60
+  IsHoming: 1
+  HomingTurnSpeed: 1000
   RicochetCount: 0
   RicochetLayers:
     serializedVersion: 2
     m_Bits: 0
   PierceCount: 0
   ProximityRadius: 0
-  ExplosionRadius: 0
-  ExplosionForce: 0
+  ExplosionRadius: 20
+  ExplosionForce: 20
   CritChance: 15
   CritMultiplier: 2
   PrimaryDamageStats:
