@@ -3,9 +3,21 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
+// ============================================================================
+// WEAPON CONTROLLER - ENHANCED
+// ============================================================================
+
+/// <summary>
+/// Advanced weapon controller supporting multiple firing modes, charge mechanics,
+/// ammo systems, multi-target lock-on, and lead prediction.
+/// Fully integrated with WeaponData ScriptableObject and SmartProjectile system.
+/// </summary>
 public class WeaponController : MonoBehaviour
 {
-    // --- CONFIGURATION ---
+    // ========================================================================
+    // CONFIGURATION
+    // ========================================================================
+
     [Header("Data Source")]
     [Tooltip("Drag the Scriptable Object here.")]
     public WeaponData data;
@@ -13,8 +25,10 @@ public class WeaponController : MonoBehaviour
     [Header("Scene References")]
     [Tooltip("Where the bullet spawns.")]
     public Transform MuzzlePoint;
+
     [Tooltip("Used for raycasting what you are looking at.")]
     public Camera MainCamera;
+
     [Tooltip("Which layers count as enemies for Lock-on?")]
     public LayerMask EnemyLayer;
 
@@ -22,98 +36,388 @@ public class WeaponController : MonoBehaviour
     [Tooltip("Drag the physical 3D object that represents your crosshair here.")]
     public Transform AimingObject;
 
-    // --- STATE MACHINE VARIABLES ---
+    [Header("Owner")]
+    [Tooltip("The ship that owns this weapon (for kill credit).")]
+    public GameObject OwnerShip;
+
+    // ========================================================================
+    // STATE MACHINE VARIABLES
+    // ========================================================================
+
     private float nextFireTime;          // Tracks cooldown between shots
     private bool isTriggerHeld;          // Is the player holding the button?
-    private float currentChargeTime;     // For ChargeToFire mode
     private bool isBursting;             // Prevents interrupting a burst
 
-// --- TARGETING STATE (NEW) ---
-    // We now store a LIST of targets, not just one.
+    // ========================================================================
+    // CHARGE SYSTEM STATE
+    // ========================================================================
+
+    private float currentChargeTime;     // Current charge progress
+    private bool isCharging;             // Is weapon actively charging?
+    private bool isFullyCharged;         // Has weapon reached full charge?
+    private float currentSpoolFireRate;  // For SpoolUp charge style
+
+    // ========================================================================
+    // AMMO SYSTEM STATE
+    // ========================================================================
+
+    private int currentAmmo;             // Current ammo count
+    private float currentHeat;           // Current heat level (for HeatSink)
+    private bool isOverheated;           // Is weapon overheated?
+    private bool isReloading;            // Is weapon currently reloading?
+    private float overheatRecoveryTimer; // Timer for overheat penalty
+
+    // ========================================================================
+    // TARGETING STATE
+    // ========================================================================
+
     private class TargetTrackData
     {
         public Transform transform;
         public float lockTimer;
         public Vector3 predictedPos;
-        public bool isLocked; // Is the timer full?
+        public bool isLocked;
     }
 
     private List<TargetTrackData> activeTargets = new List<TargetTrackData>();
-    private TargetTrackData primaryTarget; // The specific target closest to crosshair
-    // --- UNITY METHODS ---
+    private TargetTrackData primaryTarget;
+
+    // ========================================================================
+    // UNITY LIFECYCLE
+    // ========================================================================
+
+    private void Start()
+    {
+        InitializeWeapon();
+    }
 
     private void Update()
     {
-        // 1. CONSTANTLY SCAN FOR TARGETS
-        // We run this every frame to update the Lead Prediction and Lock-on status
+        // 1. Update targeting system
         HandleTargetingSystem();
 
-        // 2. HANDLE FIRING LOGIC
+        // 2. Update ammo/heat system
+        HandleAmmoSystem();
+
+        // 3. Handle charge mechanics
+        HandleChargeSystem();
+
+        // 4. Handle firing logic
         HandleFiringState();
     }
 
-    // --- PUBLIC INPUT METHODS (Call these from your Player Input script) ---
+    // ========================================================================
+    // INITIALIZATION
+    // ========================================================================
 
+    private void InitializeWeapon()
+    {
+        if (data == null)
+        {
+            Debug.LogError("WeaponData is not assigned!");
+            return;
+        }
+
+        // Set owner if not assigned
+        if (OwnerShip == null)
+        {
+            OwnerShip = gameObject;
+        }
+
+        // Initialize ammo
+        currentAmmo = data.MaxAmmo;
+        currentHeat = 0f;
+
+        // Initialize charge
+        currentChargeTime = 0f;
+        isCharging = false;
+        isFullyCharged = false;
+        currentSpoolFireRate = data.FireRate;
+    }
+
+    // ========================================================================
+    // PUBLIC INPUT METHODS
+    // ========================================================================
+
+    /// <summary>
+    /// Call this when player presses fire button.
+    /// </summary>
     public void StartFiring()
     {
-        Debug.Log("1. StartFiring called!");
         isTriggerHeld = true;
 
-        // If Semi-Auto, we try to fire immediately on the "Down" press
+        // Semi-Auto fires immediately on button down
         if (data.TriggerMode == TriggerType.SemiAuto)
         {
             TryFire();
         }
     }
 
+    /// <summary>
+    /// Call this when player releases fire button.
+    /// </summary>
     public void StopFiring()
     {
         isTriggerHeld = false;
-        
-        // If we release the button, reset the charge
-        currentChargeTime = 0; 
+
+        // ChargeToFire with HoldAndRelease fires on release
+        if (data.TriggerMode == TriggerType.ChargeToFire)
+        {
+            if (data.chargeStyle == ChargeStyle.HoldAndRelease && isFullyCharged)
+            {
+                TryFire();
+            }
+
+            // Reset charge
+            ResetCharge();
+        }
     }
 
-    // --- CORE LOGIC ---
+    /// <summary>
+    /// Call this to manually reload the weapon.
+    /// </summary>
+    public void Reload()
+    {
+        if (data.ammoSystem == AmmoSystem.Magazine && !isReloading && currentAmmo < data.MaxAmmo)
+        {
+            StartCoroutine(ReloadRoutine());
+        }
+    }
+
+    // ========================================================================
+    // CHARGE SYSTEM
+    // ========================================================================
+
+    private void HandleChargeSystem()
+    {
+        if (data.TriggerMode != TriggerType.ChargeToFire) return;
+
+        if (isTriggerHeld && !isBursting && !isReloading && !isOverheated)
+        {
+            isCharging = true;
+            currentChargeTime += Time.deltaTime;
+
+            // Handle different charge styles
+            switch (data.chargeStyle)
+            {
+                case ChargeStyle.AutoRelease:
+                    // Spartan Laser style: Auto-fire when fully charged
+                    if (currentChargeTime >= data.ChargeTime)
+                    {
+                        isFullyCharged = true;
+                        TryFire();
+                        ResetCharge();
+                    }
+                    break;
+
+                case ChargeStyle.HoldAndRelease:
+                    // Bow/Hanzo style: Must release to fire
+                    if (currentChargeTime >= data.ChargeTime)
+                    {
+                        isFullyCharged = true;
+
+                        // If not allowed to hold indefinitely, auto-fire
+                        if (!data.HoldToChargeIndefinitely)
+                        {
+                            TryFire();
+                            ResetCharge();
+                        }
+                    }
+                    break;
+
+                case ChargeStyle.SpoolUp:
+                    // Minigun style: Fire rate increases over time
+                    if (currentChargeTime >= data.ChargeTime)
+                    {
+                        isFullyCharged = true;
+                    }
+
+                    // Increase fire rate gradually
+                    float chargeProgress = Mathf.Clamp01(currentChargeTime / data.ChargeTime);
+                    currentSpoolFireRate = Mathf.Lerp(data.FireRate * 0.3f, data.FireRate, chargeProgress);
+                    break;
+            }
+
+            // TODO: Add visual/audio feedback
+            // OnChargeProgress?.Invoke(currentChargeTime / data.ChargeTime);
+        }
+        else if (isCharging)
+        {
+            // Trigger released before full charge (except SpoolUp which keeps firing)
+            if (data.chargeStyle != ChargeStyle.SpoolUp)
+            {
+                ResetCharge();
+            }
+        }
+    }
+
+    private void ResetCharge()
+    {
+        currentChargeTime = 0f;
+        isCharging = false;
+        isFullyCharged = false;
+        currentSpoolFireRate = data.FireRate;
+    }
+
+    // ========================================================================
+    // AMMO SYSTEM
+    // ========================================================================
+
+    private void HandleAmmoSystem()
+    {
+        switch (data.ammoSystem)
+        {
+            case AmmoSystem.Magazine:
+                // Standard ammo, nothing to update here
+                break;
+
+            case AmmoSystem.HeatSink:
+                // Cool down over time if not firing
+                if (!isTriggerHeld && currentHeat > 0)
+                {
+                    currentHeat -= data.CooldownRate * Time.deltaTime;
+                    currentHeat = Mathf.Max(0f, currentHeat);
+                }
+
+                // Handle overheat recovery
+                if (isOverheated)
+                {
+                    overheatRecoveryTimer -= Time.deltaTime;
+                    if (overheatRecoveryTimer <= 0f)
+                    {
+                        isOverheated = false;
+                        currentHeat = 0f;
+                    }
+                }
+                break;
+
+            case AmmoSystem.Infinite:
+                // No ammo management needed
+                break;
+        }
+    }
+
+    private bool HasAmmo()
+    {
+        switch (data.ammoSystem)
+        {
+            case AmmoSystem.Magazine:
+                return currentAmmo > 0;
+
+            case AmmoSystem.HeatSink:
+                return !isOverheated && currentHeat < data.MaxAmmo;
+
+            case AmmoSystem.Infinite:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private void ConsumeAmmo()
+    {
+        switch (data.ammoSystem)
+        {
+            case AmmoSystem.Magazine:
+                currentAmmo--;
+                if (currentAmmo <= 0)
+                {
+                    // Auto-reload when empty
+                    StartCoroutine(ReloadRoutine());
+                }
+                break;
+
+            case AmmoSystem.HeatSink:
+                currentHeat += data.HeatPerShot;
+                if (currentHeat >= data.MaxAmmo)
+                {
+                    // Overheat!
+                    isOverheated = true;
+                    currentHeat = data.MaxAmmo;
+                    overheatRecoveryTimer = data.OverheatPenaltyTime;
+                }
+                break;
+
+            case AmmoSystem.Infinite:
+                // No consumption
+                break;
+        }
+    }
+
+    private IEnumerator ReloadRoutine()
+    {
+        isReloading = true;
+
+        // TODO: Play reload animation/sound
+        // OnReloadStart?.Invoke();
+
+        yield return new WaitForSeconds(data.ReloadTime);
+
+        currentAmmo = data.MaxAmmo;
+        isReloading = false;
+
+        // TODO: Play reload complete sound
+        // OnReloadComplete?.Invoke();
+    }
+
+    // ========================================================================
+    // FIRING STATE MACHINE
+    // ========================================================================
 
     private void HandleFiringState()
     {
-        // If we are mid-burst, do not allow other firing logic to run
-        if (isBursting) return;
+        // Don't fire if bursting, reloading, or overheated
+        if (isBursting || isReloading || isOverheated) return;
 
         // MODE: Full Auto
-        // As long as trigger is held, keep trying to fire
         if (data.TriggerMode == TriggerType.FullAuto && isTriggerHeld)
         {
             TryFire();
         }
 
-        // MODE: Charge To Fire
-        // Increase charge while held. Fire when maxed.
-        if (data.TriggerMode == TriggerType.ChargeToFire && isTriggerHeld)
+        // MODE: ChargeToFire - SpoolUp
+        // SpoolUp continues firing while held after reaching charge
+        if (data.TriggerMode == TriggerType.ChargeToFire &&
+            data.chargeStyle == ChargeStyle.SpoolUp &&
+            isTriggerHeld &&
+            isFullyCharged)
         {
-            currentChargeTime += Time.deltaTime;
-            
-            // TODO: Add visual/audio feedback here (e.g., sound pitch rising)
-            
-            if (currentChargeTime >= data.ChargeTime)
-            {
-                TryFire();
-                currentChargeTime = 0; // Reset after firing
-            }
+            TryFire();
         }
     }
 
-    // Checks Cooldowns before allowing a shot
+    // ========================================================================
+    // FIRE EXECUTION
+    // ========================================================================
+
     private void TryFire()
     {
-        // Check if we are still cooling down
+        // Check cooldown
         if (Time.time < nextFireTime) return;
 
-        // Set the cooldown for the NEXT shot
-        nextFireTime = Time.time + (1f / data.FireRate);
+        // Check ammo
+        if (!HasAmmo()) return;
 
-        if (data.IsBurstFire == true)
+        // Check charge requirements
+        if (data.TriggerMode == TriggerType.ChargeToFire)
+        {
+            if (data.chargeStyle == ChargeStyle.HoldAndRelease)
+            {
+                // Can only fire if fully charged
+                if (!isFullyCharged) return;
+            }
+        }
+
+        // Set cooldown based on charge style
+        float fireRate = (data.chargeStyle == ChargeStyle.SpoolUp) ? currentSpoolFireRate : data.FireRate;
+        nextFireTime = Time.time + (1f / fireRate);
+
+        // Consume ammo
+        ConsumeAmmo();
+
+        // Execute shot
+        if (data.IsBurstFire)
         {
             StartCoroutine(PerformBurst());
         }
@@ -123,41 +427,44 @@ public class WeaponController : MonoBehaviour
         }
     }
 
-    // Coroutine for Burst Fire (Fire -> Wait -> Fire -> Wait)
     private IEnumerator PerformBurst()
     {
-        isBursting = true; // Lock the gun so it can't fire other modes
+        isBursting = true;
 
         for (int i = 0; i < data.BurstCount; i++)
         {
             ExecuteShot();
-            // Wait for the small delay between burst bullets
-            yield return new WaitForSeconds(data.BurstDelay);
+
+            // Don't wait after last bullet
+            if (i < data.BurstCount - 1)
+            {
+                yield return new WaitForSeconds(data.BurstDelay);
+            }
         }
 
-        isBursting = false; // Unlock
+        isBursting = false;
     }
 
-// --- THE NEW FIRING LOGIC ---
+    // ========================================================================
+    // SHOT EXECUTION
+    // ========================================================================
+
     private void ExecuteShot()
     {
-        Debug.Log("3. Executing Shot logic..."); // DEBUG
-        // LOGIC BRANCH: Single Target vs Multi-Target Weapon
-        
+        // Single target vs Multi-target logic
         if (data.MaxLockTargets == 1)
         {
-            // STANDARD GUN: Fires 1 stream at the Primary Target (or straight ahead)
+            // Standard weapon: Fire at primary target or straight ahead
             SpawnProjectile(primaryTarget);
         }
         else
         {
-            // MULTI-LOCK WEAPON (Missile Swarm): Fires at ALL locked targets
-            // 1. Get all targets that are fully locked
+            // Multi-lock weapon: Fire at all locked targets
             var readyTargets = activeTargets.Where(t => t.isLocked).ToList();
 
             if (readyTargets.Count > 0)
             {
-                // Fire at everyone!
+                // Fire at each locked target
                 foreach (var targetData in readyTargets)
                 {
                     SpawnProjectile(targetData);
@@ -165,52 +472,24 @@ public class WeaponController : MonoBehaviour
             }
             else
             {
-                // No locks yet? Fire one dumb fire shot forward
+                // No locks, fire forward
                 SpawnProjectile(null);
             }
         }
     }
 
-    // Refactored aiming/spawning into a helper function
+    // ========================================================================
+    // PROJECTILE SPAWNING
+    // ========================================================================
+
     private void SpawnProjectile(TargetTrackData specificTarget)
     {
         for (int i = 0; i < data.ProjectlilesCount; i++)
         {
-            // 1. Aim Logic
-            Vector3 aimDir = MuzzlePoint.forward;
-            Transform homingTargetTransform = null;
+            // 1. Calculate aim direction
+            Vector3 aimDir = CalculateAimDirection(specificTarget, out Transform homingTarget);
 
-            if (specificTarget != null)
-            {
-                // We have a specific target (either Primary or one of the swarm)
-                Vector3 directionToLead = (specificTarget.predictedPos - MuzzlePoint.position).normalized;
-                
-                // For Multi-Lock missiles, we ALWAYS aim at the target.
-                // For Standard Gun, we check aiming cone (Aim Assist).
-                if (data.MaxLockTargets > 1)
-                {
-                    aimDir = directionToLead; // Always snap for missiles
-                    homingTargetTransform = specificTarget.transform;
-                }
-                else
-                {      
-                    // Gun Logic: Check Aim Assist Cone
-                    // We compare the direction to the ENEMY vs the direction to the SPHERE
-                    Vector3 dirToSphere = (AimingObject.position - MuzzlePoint.position).normalized;
-                    float angle = Vector3.Angle(dirToSphere, directionToLead);
-
-                    if (angle < data.AssistConeAngle) aimDir = directionToLead;
-                    else aimDir = dirToSphere; // Aim at the sphere if assist fails
-
-                    if (data.IsHoming) homingTargetTransform = specificTarget.transform;
-                }
-            }
-            else
-            {
-                // NO TARGET: Aim directly at the 3D Sphere
-                aimDir = (AimingObject.position - MuzzlePoint.position).normalized;
-            }
-            // 2. Spread
+            // 2. Apply spread
             if (data.SpreadAngle > 0)
             {
                 float x = Random.Range(-data.SpreadAngle, data.SpreadAngle);
@@ -218,48 +497,114 @@ public class WeaponController : MonoBehaviour
                 aimDir = Quaternion.Euler(x, y, 0) * aimDir;
             }
 
-            // 3. Instantiate
-            GameObject projectileObj = Instantiate(data.ProjectilePrefab, MuzzlePoint.position, Quaternion.LookRotation(aimDir));
+            // 3. Instantiate projectile
+            GameObject projectileObj = Instantiate(
+                data.ProjectilePrefab,
+                MuzzlePoint.position,
+                Quaternion.LookRotation(aimDir)
+            );
 
-            // 4. Initialize
+            // 4. Initialize projectile with full configuration
             SmartProjectile projectileScript = projectileObj.GetComponent<SmartProjectile>();
             if (projectileScript != null)
             {
-                // (Your existing Crit calculation here...)
-                bool isCrit = Random.Range(0f, 100f) <= data.CritChance;
-                DamagePayload finalPayload = data.DamageStats;
-                if (isCrit)
-                {
-                    finalPayload.IsCritical = true;
-                    finalPayload.PhysicalDamage *= data.CritMultiplier;
-                    finalPayload.EnergyDamage *= data.CritMultiplier;
-                }
+                // Create damage payload with critical hit calculation
+                DamagePayload finalPayload = CreateDamagePayload();
 
+                // Initialize with all parameters
                 projectileScript.Initialize(
                     finalPayload,
+                    OwnerShip,
                     data.ProjectileSpeed,
-                    5.0f,
-                    homingTargetTransform, // Pass the specific target!
+                    data.ProjectileLifetime,
+                    homingTarget,
                     data.HomingTurnSpeed,
                     data.PierceCount,
+                    data.RicochetCount,
+                    data.RicochetLayers,
                     data.ExplosionRadius,
                     data.ProximityRadius,
                     data.ExplosionForce,
-                    EnemyLayer
+                    data.CritChance,
+                    data.CritMultiplier,
+                    EnemyLayer,
+                    data.PayloadTrigger,
+                    data.TriggerValue,
+                    data.SecondaryPrefab,
+                    data.SpawnCount,
+                    data.SpawnSpreadAngle,
+                    data.InheritVelocity,
+                    data.SecondaryDamageStats
                 );
             }
         }
     }
 
-    // --- THE NEW MULTI-TARGETING SYSTEM ---
-
-    // --- AIMING & MATH ---
-
-    // --- TARGETING SYSTEM ---
-
-private void HandleTargetingSystem()
+    private Vector3 CalculateAimDirection(TargetTrackData specificTarget, out Transform homingTarget)
     {
-        // 1. CLEANUP: Remove null targets (destroyed enemies)
+        homingTarget = null;
+
+        if (specificTarget != null)
+        {
+            Vector3 directionToLead = (specificTarget.predictedPos - MuzzlePoint.position).normalized;
+
+            // Multi-lock missiles always snap to target
+            if (data.MaxLockTargets > 1)
+            {
+                homingTarget = specificTarget.transform;
+                return directionToLead;
+            }
+            else
+            {
+                // Standard weapon with aim assist
+                Vector3 dirToSphere = (AimingObject.position - MuzzlePoint.position).normalized;
+                float angle = Vector3.Angle(dirToSphere, directionToLead);
+
+                if (angle < data.AssistConeAngle)
+                {
+                    // Aim assist kicks in
+                    if (data.IsHoming) homingTarget = specificTarget.transform;
+                    return directionToLead;
+                }
+                else
+                {
+                    // Outside assist cone, aim at crosshair
+                    return dirToSphere;
+                }
+            }
+        }
+        else
+        {
+            // No target, aim at crosshair
+            return (AimingObject.position - MuzzlePoint.position).normalized;
+        }
+    }
+
+    private DamagePayload CreateDamagePayload()
+    {
+        // Roll for critical hit
+        bool isCrit = Random.Range(0f, 100f) <= data.CritChance;
+
+        DamagePayload payload = data.PrimaryDamageStats;
+        payload.Source = OwnerShip;
+        payload.IsCritical = isCrit;
+
+        if (isCrit)
+        {
+            payload.PhysicalDamage *= data.CritMultiplier;
+            payload.EnergyDamage *= data.CritMultiplier;
+        }
+
+        return payload;
+    }
+
+    // ========================================================================
+    // TARGETING SYSTEM
+    // ========================================================================
+
+    private void HandleTargetingSystem()
+    {
+        // 1. Remove destroyed targets
         for (int i = activeTargets.Count - 1; i >= 0; i--)
         {
             if (activeTargets[i].transform == null || !activeTargets[i].transform.gameObject.activeInHierarchy)
@@ -268,79 +613,75 @@ private void HandleTargetingSystem()
             }
         }
 
-        // 2. SCAN: Find all valid targets in view
+        // 2. Scan for potential targets
         Collider[] potentialEnemies = Physics.OverlapSphere(transform.position, data.MaxLockDistance, EnemyLayer);
-        
+
         foreach (Collider col in potentialEnemies)
         {
-            // A. Check Angle
+            // Check if in FOV
             Vector3 dirToEnemy = (col.transform.position - MainCamera.transform.position).normalized;
             float angle = Vector3.Angle(MainCamera.transform.forward, dirToEnemy);
 
-            // 60 degree field of view for locking
-            if (angle < 60f) 
+            if (angle < 60f)
             {
-                // B. Check if we already track this guy
+                // Check if already tracking
                 TargetTrackData existingData = activeTargets.Find(x => x.transform == col.transform);
 
                 if (existingData == null)
                 {
-                    // New target found! Add if we haven't hit the cap
+                    // Add new target if under limit
                     if (activeTargets.Count < data.MaxLockTargets || data.MaxLockTargets == 1)
                     {
-                        // Note: If MaxTargets is 1, we just add them all to the list anyway 
-                        // and let the "Primary Target" logic pick the best one. 
-                        // This allows switching targets smoothly.
-                        TargetTrackData newData = new TargetTrackData();
-                        newData.transform = col.transform;
-                        newData.lockTimer = 0;
+                        TargetTrackData newData = new TargetTrackData
+                        {
+                            transform = col.transform,
+                            lockTimer = 0,
+                            isLocked = false
+                        };
                         activeTargets.Add(newData);
                     }
                 }
             }
         }
 
-        // 3. UPDATE & PRUNE: Calculate predictions and timers
-        // Also remove targets that went off-screen (angle > 60) or too far
+        // 3. Update tracked targets
         for (int i = activeTargets.Count - 1; i >= 0; i--)
         {
             var tData = activeTargets[i];
-            
-            // Re-check distance and angle
+
+            // Check if still in range and FOV
             float dist = Vector3.Distance(transform.position, tData.transform.position);
             Vector3 dir = (tData.transform.position - MainCamera.transform.position).normalized;
             float ang = Vector3.Angle(MainCamera.transform.forward, dir);
 
-            if (dist > data.MaxLockDistance || ang > 65f) // 65f gives a small buffer before losing lock
+            if (dist > data.MaxLockDistance || ang > 65f)
             {
                 activeTargets.RemoveAt(i);
                 continue;
             }
 
-            // Update Timer
+            // Update lock timer
             tData.lockTimer += Time.deltaTime;
-            if (tData.lockTimer >= data.LockOnTimeNeeded) tData.isLocked = true;
+            if (tData.lockTimer >= data.LockOnTimeNeeded)
+            {
+                tData.isLocked = true;
+            }
 
-            // Update Prediction
+            // Update lead prediction
             Rigidbody targetRb = tData.transform.GetComponent<Rigidbody>();
             Vector3 targetVel = (targetRb != null) ? targetRb.linearVelocity : Vector3.zero;
             float travelTime = dist / data.ProjectileSpeed;
             tData.predictedPos = tData.transform.position + (targetVel * travelTime);
         }
 
-// 4. FIND PRIMARY TARGET (Updated)
-        // We find the target closest to our 3D AIMING SPHERE (not the center of the screen)
+        // 4. Find primary target (closest to crosshair)
         primaryTarget = null;
-        float bestAngle = data.AssistConeAngle * 2; 
-
-        // Calculate the direction from Camera to our Crosshair Sphere
+        float bestAngle = data.AssistConeAngle * 2;
         Vector3 aimDirection = (AimingObject.position - MainCamera.transform.position).normalized;
 
         foreach (var tData in activeTargets)
         {
             Vector3 dirToTarget = (tData.transform.position - MainCamera.transform.position).normalized;
-            
-            // Compare target direction against our Sphere direction
             float angleFromCrosshair = Vector3.Angle(aimDirection, dirToTarget);
 
             if (angleFromCrosshair < bestAngle)
@@ -350,7 +691,25 @@ private void HandleTargetingSystem()
             }
         }
     }
-    // --- DEBUG GIZMOS ---
+
+    // ========================================================================
+    // PUBLIC GETTERS (For UI)
+    // ========================================================================
+
+    public int GetCurrentAmmo() => currentAmmo;
+    public int GetMaxAmmo() => data.MaxAmmo;
+    public float GetCurrentHeat() => currentHeat;
+    public float GetMaxHeat() => data.MaxAmmo;
+    public float GetChargeProgress() => currentChargeTime / data.ChargeTime;
+    public bool IsFullyCharged() => isFullyCharged;
+    public bool IsOverheated() => isOverheated;
+    public bool IsReloading() => isReloading;
+    public int GetLockedTargetCount() => activeTargets.Count(t => t.isLocked);
+
+    // ========================================================================
+    // DEBUG VISUALIZATION
+    // ========================================================================
+
     private void OnDrawGizmos()
     {
         if (activeTargets == null) return;
@@ -359,10 +718,13 @@ private void HandleTargetingSystem()
         {
             if (t == null || t.transform == null) continue;
 
-            // Yellow = Acquiring, Red = Locked, Green = Primary
-            if (t == primaryTarget) Gizmos.color = Color.green;
-            else if (t.isLocked) Gizmos.color = Color.red;
-            else Gizmos.color = Color.yellow;
+            // Color code: Green = Primary, Red = Locked, Yellow = Acquiring
+            if (t == primaryTarget)
+                Gizmos.color = Color.green;
+            else if (t.isLocked)
+                Gizmos.color = Color.red;
+            else
+                Gizmos.color = Color.yellow;
 
             Gizmos.DrawWireSphere(t.predictedPos, 1f);
             Gizmos.DrawLine(t.transform.position, t.predictedPos);
