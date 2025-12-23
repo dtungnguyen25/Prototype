@@ -40,6 +40,13 @@ public class WeaponController : MonoBehaviour
     [Tooltip("The ship that owns this weapon (for kill credit).")]
     public GameObject OwnerShip;
 
+    [Header("Visual Effects (Optional)")]
+    [Tooltip("Line Renderer prefab for hitscan beam trails.")]
+    public GameObject BeamTrailPrefab;
+    
+    [Tooltip("Impact effect for hitscan hits.")]
+    public GameObject HitscanImpactPrefab;
+
     // ========================================================================
     // STATE MACHINE VARIABLES
     // ========================================================================
@@ -302,12 +309,12 @@ public class WeaponController : MonoBehaviour
         switch (data.ammoSystem)
         {
             case AmmoSystem.Magazine:
-                return currentAmmo > 0;
+                return currentAmmo > 0; // Must have bullets left
 
             case AmmoSystem.HeatSink:
-                return !isOverheated && currentHeat < data.MaxAmmo;
+                return !isOverheated && currentHeat < data.MaxAmmo; // Can't fire if overheated
 
-            case AmmoSystem.Infinite:
+            case AmmoSystem.Infinite: // Always has ammo
                 return true;
 
             default:
@@ -335,7 +342,7 @@ public class WeaponController : MonoBehaviour
                     // Overheat!
                     isOverheated = true;
                     currentHeat = data.MaxAmmo;
-                    overheatRecoveryTimer = data.OverheatPenaltyTime;
+                    overheatRecoveryTimer = data.OverheatPenaltyTime; // Start penalty timer
                 }
                 break;
 
@@ -449,13 +456,13 @@ public class WeaponController : MonoBehaviour
     // SHOT EXECUTION
     // ========================================================================
 
-    private void ExecuteShot()
+private void ExecuteShot()
     {
         // Single target vs Multi-target logic
         if (data.MaxLockTargets == 1)
         {
             // Standard weapon: Fire at primary target or straight ahead
-            SpawnProjectile(primaryTarget);
+            ProcessFire(primaryTarget);
         }
         else
         {
@@ -467,44 +474,301 @@ public class WeaponController : MonoBehaviour
                 // Fire at each locked target
                 foreach (var targetData in readyTargets)
                 {
-                    SpawnProjectile(targetData);
+                    ProcessFire(targetData);
                 }
             }
             else
             {
                 // No locks, fire forward
-                SpawnProjectile(null);
+                ProcessFire(null);
             }
         }
     }
 
     // ========================================================================
-    // PROJECTILE SPAWNING
+    // PROCESS FIRE LOGIC
     // ========================================================================
 
-    private void SpawnProjectile(TargetTrackData specificTarget)
+    private void ProcessFire(TargetTrackData specificTarget)
     {
+        // Calculate aim direction (shared by both methods)
+        Vector3 aimDir = CalculateAimDirection(specificTarget, out Transform homingTarget);
+
+        // Apply spread if enabled
+            if (data.SpreadAngle > 0)
+        {
+            float x = Random.Range(-data.SpreadAngle, data.SpreadAngle);
+            float y = Random.Range(-data.SpreadAngle, data.SpreadAngle);
+            aimDir = Quaternion.Euler(x, y, 0) * aimDir;
+        }
+
+        // Fire multiple projectiles for shotgun-style spread
         for (int i = 0; i < data.ProjectlilesCount; i++)
         {
-            // 1. Calculate aim direction
-            Vector3 aimDir = CalculateAimDirection(specificTarget, out Transform homingTarget);
-
-            // 2. Apply spread
+            // Apply individual spread per projectile
+            Vector3 finalAimDir = aimDir;
+            
             if (data.SpreadAngle > 0)
             {
                 float x = Random.Range(-data.SpreadAngle, data.SpreadAngle);
                 float y = Random.Range(-data.SpreadAngle, data.SpreadAngle);
-                aimDir = Quaternion.Euler(x, y, 0) * aimDir;
+                finalAimDir = Quaternion.Euler(x, y, 0) * aimDir;
             }
 
-            // 3. Instantiate projectile
+            // Choose firing method
+            if (data.FiringMethod == FiringMethod.Hitscan)
+            {
+                FireHitscan(MuzzlePoint.position, finalAimDir);
+            }
+            else if (data.FiringMethod == FiringMethod.Projectile)
+            {
+                FireProjectile(finalAimDir, homingTarget);
+            }
+            // TODO: Implement FiringMethod.Hybrid
+        }
+    }
+
+    // ========================================================================
+    // HITSCAN FIRING
+    // ========================================================================
+
+    private void FireHitscan(Vector3 startOrigin, Vector3 aimDirection)
+    {
+        // Calculate maximum range
+        float maxRange = (data.ProjectileLifetime > 0) 
+            ? data.ProjectileSpeed * data.ProjectileLifetime 
+            : 1000f;
+
+        Vector3 currentOrigin = startOrigin;
+        Vector3 currentDirection = aimDirection;
+        float remainingRange = maxRange;
+        
+        // Track pierced targets to prevent multi-hitting
+        HashSet<Collider> piercedTargets = new HashSet<Collider>();
+        int remainingPierces = data.PierceCount;
+
+        // Loop for ricochets (0 ricochets = runs once)
+        for (int bounce = 0; bounce <= data.RicochetCount; bounce++)
+        {
+            // Raycast against enemies and ricochet surfaces
+            if (Physics.Raycast(currentOrigin, currentDirection, out RaycastHit hit, 
+                remainingRange, EnemyLayer | data.RicochetLayers))
+            {
+                // Calculate distance traveled
+                float distanceTraveled = Vector3.Distance(currentOrigin, hit.point);
+                
+                // Spawn beam trail VFX
+                SpawnBeamTrail(currentOrigin, hit.point);
+
+                // Check if hit a damageable target
+                IDamageable damageable = hit.collider.GetComponent<IDamageable>();
+                
+                if (damageable != null && !piercedTargets.Contains(hit.collider))
+                {
+                    // Generate damage payload
+                    DamagePayload payload = CreateDamagePayload();
+                    payload.HitPoint = hit.point;
+                    payload.HitNormal = hit.normal;
+                    payload.DamageDirection = currentDirection;
+
+                    // Apply damage
+                    damageable.TakeDamage(payload);
+                    
+                    // Spawn impact VFX
+                    SpawnHitscanImpact(hit.point, hit.normal);
+
+                    // Handle piercing
+                    if (remainingPierces > 0)
+                    {
+                        piercedTargets.Add(hit.collider);
+                        remainingPierces--;
+                        
+                        // Continue through the target
+                        remainingRange -= distanceTraveled;
+                        currentOrigin = hit.point + currentDirection * 0.01f; // Small offset
+                        continue;
+                    }
+                    else
+                    {
+                        // No pierces left, stop here
+                        break;
+                    }
+                }
+
+                // Handle explosion on impact
+                if (data.ExplosionRadius > 0)
+                {
+                    CreateHitscanExplosion(hit.point, CreateDamagePayload());
+                }
+
+                // Handle secondary payload spawn
+                if (data.PayloadTrigger == SpawnTrigger.OnImpact && data.SecondaryPrefab != null)
+                {
+                    SpawnSecondaryPayload(hit.point, hit.normal);
+                }
+
+                // Check for ricochet
+                if (IsRicochetSurface(hit.collider))
+                {
+                    // Calculate reflection
+                    Vector3 reflection = Vector3.Reflect(currentDirection, hit.normal);
+                    
+                    remainingRange -= distanceTraveled;
+                    
+                    if (remainingRange <= 0) break;
+                    
+                    currentOrigin = hit.point + hit.normal * 0.01f; // Offset from surface
+                    currentDirection = reflection;
+                    
+                    // Optional: Add slight randomness to bounce
+                    // currentDirection = Quaternion.Euler(Random.Range(-2f, 2f), Random.Range(-2f, 2f), 0) * currentDirection;
+                }
+                else
+                {
+                    // Hit non-ricochet surface, stop
+                    break;
+                }
+            }
+            else
+            {
+                // Missed everything, draw beam to max range
+                Vector3 endPoint = currentOrigin + currentDirection * remainingRange;
+                SpawnBeamTrail(currentOrigin, endPoint);
+                break;
+            }
+        }
+    }
+
+    private bool IsRicochetSurface(Collider collider)
+    {
+        return ((1 << collider.gameObject.layer) & data.RicochetLayers) != 0;
+    }
+
+    private void CreateHitscanExplosion(Vector3 center, DamagePayload basePayload)
+    {
+        Collider[] hitColliders = Physics.OverlapSphere(center, data.ExplosionRadius, EnemyLayer);
+
+        foreach (var hitCollider in hitColliders)
+        {
+            IDamageable target = hitCollider.GetComponent<IDamageable>();
+            if (target != null)
+            {
+                // Calculate falloff
+                float distance = Vector3.Distance(center, hitCollider.transform.position);
+                float distanceRatio = distance / data.ExplosionRadius;
+                float falloffMultiplier = 1f - (distanceRatio * distanceRatio);
+                falloffMultiplier = Mathf.Max(falloffMultiplier, 0.2f);
+
+                // Create explosion payload with falloff
+                DamagePayload explosionPayload = basePayload;
+                explosionPayload.PhysicalDamage *= falloffMultiplier;
+                explosionPayload.EnergyDamage *= falloffMultiplier;
+                explosionPayload.HitPoint = hitCollider.transform.position;
+                explosionPayload.DamageDirection = (hitCollider.transform.position - center).normalized;
+
+                // Roll crit for each target in explosion
+                bool isCrit = Random.Range(0f, 100f) <= data.CritChance;
+                explosionPayload.IsCritical = isCrit;
+                if (isCrit)
+                {
+                    explosionPayload.PhysicalDamage *= data.CritMultiplier;
+                    explosionPayload.EnergyDamage *= data.CritMultiplier;
+                }
+
+                target.TakeDamage(explosionPayload);
+            }
+
+            // Apply physics force
+            if (data.ExplosionForce > 0)
+            {
+                Rigidbody rb = hitCollider.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.AddExplosionForce(data.ExplosionForce, center, data.ExplosionRadius, 1f, ForceMode.Impulse);
+                }
+            }
+        }
+        
+        // TODO: Spawn explosion VFX
+    }
+
+    private void SpawnSecondaryPayload(Vector3 position, Vector3 normal)
+    {
+        for (int i = 0; i < data.SpawnCount; i++)
+        {
+            Quaternion rotation = Quaternion.LookRotation(normal);
+
+            if (data.SpawnSpreadAngle > 0)
+            {
+                float x = Random.Range(-data.SpawnSpreadAngle, data.SpawnSpreadAngle);
+                float y = Random.Range(-data.SpawnSpreadAngle, data.SpawnSpreadAngle);
+                rotation = Quaternion.Euler(x, y, 0) * rotation;
+            }
+
+            GameObject spawned = Instantiate(data.SecondaryPrefab, position, rotation);
+
+            // Initialize if it's a SmartProjectile
+            SmartProjectile subProj = spawned.GetComponent<SmartProjectile>();
+            if (subProj != null)
+            {
+                subProj.Initialize(
+                    data.SecondaryDamageStats,
+                    OwnerShip,
+                    data.ProjectileSpeed * 0.5f, // Half speed for secondary
+                    5f,
+                    null,
+                    0f,
+                    0, 0,
+                    data.RicochetLayers,
+                    data.ExplosionRadius * 0.5f,
+                    0f,
+                    data.ExplosionForce * 0.5f,
+                    0f, 1f,
+                    EnemyLayer,
+                    SpawnTrigger.None,
+                    0f, null, 0, 0f, false,
+                    data.SecondaryDamageStats
+                );
+            }
+        }
+    }
+
+    private void SpawnBeamTrail(Vector3 start, Vector3 end)
+    {
+        if (BeamTrailPrefab == null) return;
+
+        GameObject trail = Instantiate(BeamTrailPrefab, start, Quaternion.identity);
+        LineRenderer lineRenderer = trail.GetComponent<LineRenderer>();
+        
+        if (lineRenderer != null)
+        {
+            lineRenderer.SetPosition(0, start);
+            lineRenderer.SetPosition(1, end);
+            
+            // Auto-destroy after a short time
+            Destroy(trail, 0.1f);
+        }
+    }
+
+    private void SpawnHitscanImpact(Vector3 position, Vector3 normal)
+    {
+        if (HitscanImpactPrefab == null) return;
+
+        GameObject impact = Instantiate(HitscanImpactPrefab, position, Quaternion.LookRotation(normal));
+        Destroy(impact, 2f);
+    }
+    private void FireProjectile(Vector3 aimDir, Transform homingTarget)
+    {
+        for (int i = 0; i < data.ProjectlilesCount; i++)
+        {
+            // Instantiate projectile
             GameObject projectileObj = Instantiate(
                 data.ProjectilePrefab,
                 MuzzlePoint.position,
                 Quaternion.LookRotation(aimDir)
             );
 
-            // 4. Initialize projectile with full configuration
+            // Initialize projectile with full configuration
             SmartProjectile projectileScript = projectileObj.GetComponent<SmartProjectile>();
             if (projectileScript != null)
             {
