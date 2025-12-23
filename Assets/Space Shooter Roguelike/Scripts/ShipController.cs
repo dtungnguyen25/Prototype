@@ -336,10 +336,10 @@ public class ShipController : MonoBehaviour
     /// </summary>
     private void HandleStabilization()
     {
-        // 1. Check if player is actively rotating
+        // Check if player is actively rotating
         bool isRotating = lookInput.sqrMagnitude > 0.01f;
 
-        // 2. Check if moving too fast for stabilization
+        // Check if moving too fast for stabilization
         float currentSpeed = rb.linearVelocity.magnitude;
         bool isMovingFast = currentSpeed > currentMaxSpeedForAutoLevel;
 
@@ -350,38 +350,50 @@ public class ShipController : MonoBehaviour
             return;
         }
 
-        // 3. Check if delay has passed
+        // Check if delay has passed
         float timeSinceInput = Time.time - lastInputTime;
         if (timeSinceInput < currentAutoLevelDelay)
         {
             return;
         }
 
-        // 4. Calculate roll correction to match camera up
-        // We want ship's up to align with camera's up (screen Y axis)
-        Vector3 shipUp = transform.up;
-        Vector3 cameraUp = cameraTransform.up;
+        // 1. Gimbal Lock Safety Check
+        // If looking straight up or straight down, "Right" becomes impossible to calculate.
+        // We disable stabilization when the ship is vertical.
+        float forwardDotUp = Vector3.Dot(transform.forward, Vector3.up);
+        if (Mathf.Abs(forwardDotUp) > 0.95f) 
+        {
+            return;
+        }
 
-        // Project both vectors onto the plane perpendicular to ship's forward
-        Vector3 shipForward = transform.forward;
-        Vector3 projectedShipUp = Vector3.ProjectOnPlane(shipUp, shipForward).normalized;
-        Vector3 projectedCameraUp = Vector3.ProjectOnPlane(cameraUp, shipForward).normalized;
+        // 2. Calculate "Ideal Right"
+        // Cross Product of Global Up (0,1,0) and Ship Forward gives a vector 
+        // that is perpendicular to both. This is a "Horizontal Right" vector.
+        Vector3 idealRight = Vector3.Cross(Vector3.up, transform.forward).normalized;
 
-        // Calculate the rotation needed to align projected up vectors
-        Quaternion targetRotation = Quaternion.FromToRotation(projectedShipUp, projectedCameraUp);
-        targetRotation.ToAngleAxis(out float angle, out Vector3 axis);
+        // If the ship is upside down (looping), the Cross product flips. 
+        // We need to check if we are inverted.
+        if (transform.up.y < 0)
+        {
+             // Optional: If you want to allow flying upside down, disable this block.
+             // If you want to force the ship to flip back over, keep this logic or invert idealRight.
+             // For a standard "Zero Roll" stabilizer that DOESN'T allow upside-down flying:
+             // idealRight is correct as is.
+        }
 
-        // Normalize angle to -180 to 180 range
-        if (angle > 180f) angle -= 360f;
+        // 3. Calculate Correction
+        // We want to align the ship's current Right vector with the Ideal Right.
+        Vector3 currentRight = transform.right;
+        
+        // Calculate the angle between current wings and flat horizon wings
+        float angleError = Vector3.SignedAngle(currentRight, idealRight, transform.forward);
 
-        // Apply torque only around the forward axis (roll only)
-        // We project the axis onto the forward direction to isolate roll
-        float rollComponent = Vector3.Dot(axis, shipForward);
-        Vector3 rollAxis = shipForward * rollComponent;
+        // 4. Apply Torque
+        // We only apply torque along the Forward axis (Rolling)
+        Vector3 correctionTorque = transform.forward * (angleError * currentAutoLevelSpeed * Mathf.Deg2Rad);
 
-        // Apply stabilization torque
-        Vector3 stabilizationTorque = rollAxis * (angle * currentAutoLevelSpeed * Mathf.Deg2Rad);
-        rb.AddTorque(stabilizationTorque - rb.angularVelocity * 0.5f); // Add damping
+        // Apply with damping
+        rb.AddTorque(correctionTorque - (rb.angularVelocity * 0.5f));
     }
 
     // ========================================================================
