@@ -12,36 +12,82 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2049ece9fd660c74baa01c4195d2268c, type: 3}
   m_Name: StandardGatlinggGun
   m_EditorClassIdentifier: 
-  TriggerMode: 0
-  IsBurstFire: 1
+  TriggerMode: 1
+  FiringMethod: 0
+  IsBurstFire: 0
   FireRate: 5
   ProjectlilesCount: 10
   SpreadAngle: 1
   BurstCount: 3
-  BurstDelay: 0.2
+  BurstDelay: 0.05
+  chargeStyle: 0
   ChargeTime: 1
-  ProjectilePrefab: {fileID: 7855115645376301421, guid: b0a52c17de45f4b4681e0dfe7da0eff2, type: 3}
+  HoldToChargeIndefinitely: 0
   ProjectileSpeed: 100
+  ProjectileLifetime: 10
+  ProjectilePrefab: {fileID: 7855115645376301421, guid: b0a52c17de45f4b4681e0dfe7da0eff2, type: 3}
+  ammoSystem: 0
+  MaxAmmo: 30
+  CurrentAmmo: 30
+  ReloadTime: 2
+  HeatPerShot: 10
+  CooldownRate: 20
+  OverheatPenaltyTime: 3
   LockOnTimeNeeded: 1
   MaxLockDistance: 100
   MaxLockTargets: 1
   AssistConeAngle: 5
   IsHoming: 0
   HomingTurnSpeed: 60
+  RicochetCount: 0
+  RicochetLayers:
+    serializedVersion: 2
+    m_Bits: 0
   PierceCount: 0
   ProximityRadius: 0
   ExplosionRadius: 0
   ExplosionForce: 0
   CritChance: 15
   CritMultiplier: 2
-  DamageStats:
+  PrimaryDamageStats:
     PhysicalDamage: 10
     EnergyDamage: 10
     ShieldPenetration: 0
     ArmorPenetration: 0
     DamageToShieldsMultiplier: 0
     DamageToArmorMultiplier: 0
-    ImpactForce: 0
+    DamageToHullMultiplier: 0
     IsCritical: 0
+    HitWeakpoint: 0
+    WeakpointMultiplier: 0
+    AppliedEffects: []
+    ImpactForce: 0
+    DamageDirection: {x: 0, y: 0, z: 0}
+    LifestealPercent: 0
     Source: {fileID: 0}
     HitPoint: {x: 0, y: 0, z: 0}
+    HitNormal: {x: 0, y: 0, z: 0}
+  PayloadTrigger: 0
+  TriggerValue: 10
+  SecondaryPrefab: {fileID: 0}
+  SpawnCount: 1
+  SpawnSpreadAngle: 360
+  InheritVelocity: 1
+  SecondaryDamageStats:
+    PhysicalDamage: 0
+    EnergyDamage: 0
+    ShieldPenetration: 0
+    ArmorPenetration: 0
+    DamageToShieldsMultiplier: 0
+    DamageToArmorMultiplier: 0
+    DamageToHullMultiplier: 0
+    IsCritical: 0
+    HitWeakpoint: 0
+    WeakpointMultiplier: 0
+    AppliedEffects: []
+    ImpactForce: 0
+    DamageDirection: {x: 0, y: 0, z: 0}
+    LifestealPercent: 0
+    Source: {fileID: 0}
+    HitPoint: {x: 0, y: 0, z: 0}
+    HitNormal: {x: 0, y: 0, z: 0}

@@ -5,6 +5,8 @@ TagManager:
   serializedVersion: 3
   tags:
   - Enemy
+  - NPC
+  - Projectile
   layers:
   - Default
   - TransparentFX
@@ -15,6 +17,7 @@ TagManager:
   - Enemy
   - 
   - 
+  - Dirt
   - 
   - 
   - 
@@ -29,11 +32,10 @@ TagManager:
   - 
   - 
   - 
+  - NonClippable
+  - SSC Celestials
   - 
-  - 
-  - 
-  - 
-  - 
+  - Small Ships
   - 
   - 
   - 
