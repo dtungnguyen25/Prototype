@@ -1,27 +1,41 @@
-using NUnit.Framework.Internal.Commands;
 using UnityEngine;
-using UnityEngine.InputSystem; // Required for the New Input System
+using UnityEngine.InputSystem;
 
+// ============================================================================
+// SHIP CONTROLLER
+// ============================================================================
+
+/// <summary>
+/// Advanced ship controller supporting 6DOF movement, boost, dodge, auto-stabilization,
+/// and weapon systems. Uses Unity's New Input System.
+/// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class ShipController : MonoBehaviour
 {
+    // ========================================================================
+    // DEPENDENCIES
+    // ========================================================================
+
     [Header("Dependencies")]
-    [Tooltip("The camera the ship moves relative to.")]
+    [Tooltip("The camera the ship moves relative to. Used for camera-space controls.")]
     public Transform cameraTransform;
 
     [Header("Configuration")]
-    // This is where you drag in your "LightShip", "HeavyShip", etc.
-    public ShipStats currentShipStats; 
+    [Tooltip("Ship stats ScriptableObject (e.g., LightShip, HeavyShip).")]
+    public ShipStats currentShipStats;
 
     [Header("Weapons")]
-    [Tooltip("Drag the WeaponController for your Main Gun (RT) here.")]
+    [Tooltip("Primary weapon controller (RT trigger).")]
     public WeaponController primaryWeapon;
-    [Tooltip("Drag the WeaponController for your Missiles/Bombs (RB) here.")]
+
+    [Tooltip("Secondary weapon controller (RB button).")]
     public WeaponController secondaryWeapon;
 
-    // --- RUNTIME VARIABLES (Hidden from Inspector) ---
-    // We use these for actual physics. This prepares you for modifiers.
-    // e.g., currentAcceleration can be changed by a buff without breaking the original asset.
+    // ========================================================================
+    // RUNTIME STATS (MODIFIABLE)
+    // ========================================================================
+
+    // These are copied from ShipStats and can be modified at runtime by buffs/debuffs
     private float currentAcceleration;
     private float currentMaxSpeed;
     private float currentMaxBoostSpeed;
@@ -37,103 +51,155 @@ public class ShipController : MonoBehaviour
     private float currentEnergyDrainRate;
     private float currentEnergyRechargeRate;
     private float currentEnergyRechargeDelay;
-    
-    // Internal State Flags
+
+    // ========================================================================
+    // INTERNAL STATE
+    // ========================================================================
+
     private bool isBoosting = false;
-    private bool isBrakingEnabled = true; // Can be disabled later for damage effects
+    private bool isBrakingEnabled = true;
     private float currentEnergy;
-    private float lastEnergyUseTime; // Timestamp of last energy use
+    private float lastEnergyUseTime;
+    private float lastInputTime;
 
-    // Input Storage
-    private Vector2 moveInput;
-    private Vector2 lookInput;
-    private float thrustForwardInput;
-    private float thrustBackwardInput;
-    private float lastInputTime; // For auto-leveling
+    // ========================================================================
+    // INPUT STORAGE
+    // ========================================================================
 
-    // Component References
+    private Vector2 moveInput;           // WASD / Left Stick
+    private Vector2 lookInput;           // Mouse / Right Stick
+    private float thrustForwardInput;    // RT trigger
+    private float thrustBackwardInput;   // LB button
+
+    // ========================================================================
+    // COMPONENT REFERENCES
+    // ========================================================================
+
     private Rigidbody rb;
+
+    // ========================================================================
+    // INITIALIZATION
+    // ========================================================================
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        // Better for space games: turn off gravity so we don't fall
+
+        // Configure rigidbody for space flight
         rb.useGravity = false;
-        // Add some drag so the ship doesn't float forever after an explosion
-        rb.linearDamping = 1f; 
+        rb.linearDamping = 1f;
         rb.angularDamping = 2f;
 
-        // Initialize the ship with the stats assigned in the inspector
+        // Load ship stats
         if (currentShipStats != null)
         {
             LoadShipStats(currentShipStats);
         }
+        else
+        {
+            Debug.LogWarning("No ShipStats assigned to ShipController!");
+        }
 
         currentEnergy = currentMaxEnergy;
-
     }
+
     /// <summary>
-    /// Call this method to switch ships or reset stats.
-    /// It copies values from the Asset (Read-Only) to the Controller (Modifiable).
+    /// Loads stats from a ShipStats ScriptableObject into runtime variables.
+    /// Call this to switch ships or reset stats.
     /// </summary>
     public void LoadShipStats(ShipStats stats)
     {
-
-        // 1. Copy Movement values to our Runtime variables
+        // Movement
         currentAcceleration = stats.acceleration;
         currentMaxSpeed = stats.maxSpeed;
         currentMaxBoostSpeed = stats.maxBoostSpeed;
         currentBoostForce = stats.boostForce;
         currentBrakeStrength = stats.brakeStrength;
 
-        // 2. Copy Rotation values
+        // Rotation
         currentTurnSpeed = stats.turnSpeed;
         currentAutoLevelSpeed = stats.autoLevelSpeed;
         currentAutoLevelDelay = stats.autoLevelDelay;
         currentMaxSpeedForAutoLevel = stats.maxSpeedForAutoLevel;
 
-        // 3. Copy Ability values
+        // Abilities
         currentDodgeForce = stats.dodgeForce;
         currentEnergyPerDodge = stats.energyPerDodge;
         currentMaxEnergy = stats.maxEnergy;
         currentEnergyDrainRate = stats.energyDrainRate;
         currentEnergyRechargeRate = stats.energyRechargeRate;
         currentEnergyRechargeDelay = stats.energyRechargeDelay;
-
     }
 
-    #region Input Handling
-    // Link these methods to your PlayerInput component events in the Inspector
-    // OR use the generated C# class. For simplicity, here are public methods compatible with PlayerInput "Invoke Unity Events".
+    // ========================================================================
+    // UPDATE LOOPS
+    // ========================================================================
 
+    private void Update()
+    {
+        HandleEnergy();
+    }
+
+    private void FixedUpdate()
+    {
+        HandleMovement();
+        HandleRotation();
+
+        if (isBrakingEnabled)
+        {
+            HandleStabilization();
+            HandleBraking();
+        }
+    }
+
+    // ========================================================================
+    // INPUT SYSTEM CALLBACKS
+    // ========================================================================
+
+    /// <summary>
+    /// Strafe input (WASD / Left Stick).
+    /// </summary>
     public void OnMove(InputAction.CallbackContext context)
     {
         moveInput = context.ReadValue<Vector2>();
     }
 
+    /// <summary>
+    /// Rotation input (Mouse / Right Stick).
+    /// </summary>
     public void OnLook(InputAction.CallbackContext context)
     {
         lookInput = context.ReadValue<Vector2>();
     }
 
+    /// <summary>
+    /// Forward thrust input (RT trigger).
+    /// </summary>
     public void OnThrustForward(InputAction.CallbackContext context)
     {
         thrustForwardInput = context.ReadValue<float>();
     }
 
-    public void OnThrustBackward(InputAction.CallbackContext context) // For LB
+    /// <summary>
+    /// Backward thrust input (LB button).
+    /// </summary>
+    public void OnThrustBackward(InputAction.CallbackContext context)
     {
-        // LB is a button, so it returns 0 or 1
         thrustBackwardInput = context.ReadValue<float>();
     }
 
+    /// <summary>
+    /// Boost input (A button / Space).
+    /// </summary>
     public void OnBoost(InputAction.CallbackContext context)
     {
-        // Check if button is pressed or released
         if (context.started) isBoosting = true;
         if (context.canceled) isBoosting = false;
     }
 
+    /// <summary>
+    /// Dodge input (B button / Shift).
+    /// </summary>
     public void OnDodge(InputAction.CallbackContext context)
     {
         if (context.started)
@@ -142,237 +208,322 @@ public class ShipController : MonoBehaviour
         }
     }
 
-    // --- NEW WEAPON INPUTS ---
-    
-    // Link "FirePrimary" (RT) to this event
+    /// <summary>
+    /// Primary weapon fire (RT trigger).
+    /// </summary>
     public void OnFirePrimary(InputAction.CallbackContext context)
     {
         if (primaryWeapon == null) return;
 
-        if (context.performed) // Trigger squeezed
+        if (context.performed)
         {
             primaryWeapon.StartFiring();
         }
-        if (context.canceled) // Trigger released
+        if (context.canceled)
         {
             primaryWeapon.StopFiring();
         }
     }
 
-    // Link "FireSecondary" (RB) to this event
+    /// <summary>
+    /// Secondary weapon fire (RB button).
+    /// </summary>
     public void OnFireSecondary(InputAction.CallbackContext context)
     {
         if (secondaryWeapon == null) return;
 
-        if (context.started) // Button pressed
+        if (context.started)
         {
             secondaryWeapon.StartFiring();
         }
-        if (context.canceled) // Button released
+        if (context.canceled)
         {
             secondaryWeapon.StopFiring();
         }
     }
-    #endregion
 
-    private void Update()
-    {
-        // Handle Energy Logic in Update (Frame-based)
-        HandleEnergy();
-        //Debug.Log("Current Energy: " + currentEnergy.ToString("F1") );
-    }
-
-    private void FixedUpdate()
-    {
-        // Handle Physics Logic in FixedUpdate (Physics-tick based)
-        HandleMovement();
-        HandleRotation();
-        
-        if (isBrakingEnabled)
-        {
-            HandleStabilization();
-            HandleBraking();
-        }
-    }
-
-    #region Logic Implementation
+    // ========================================================================
+    // ENERGY SYSTEM
+    // ========================================================================
 
     private void HandleEnergy()
     {
         if (isBoosting && currentEnergy > 0)
         {
-            currentEnergy -= currentEnergyDrainRate * Time.deltaTime; // Drain energy
-            lastEnergyUseTime = Time.time; // Update last use time
+            // Drain energy while boosting
+            currentEnergy -= currentEnergyDrainRate * Time.deltaTime;
+            lastEnergyUseTime = Time.time;
+
+            // Clamp to prevent negative
+            if (currentEnergy < 0)
+            {
+                currentEnergy = 0;
+                isBoosting = false;
+            }
         }
         else
         {
             // Stop boosting if out of energy
-            if (currentEnergy <= 0) isBoosting = false;
-            
-            // CHECK: Has enough time passed since we last used energy?
+            if (currentEnergy <= 0)
+            {
+                isBoosting = false;
+            }
+
+            // Recharge after delay
             if (Time.time > lastEnergyUseTime + currentEnergyRechargeDelay)
             {
-            // Recharge
-            currentEnergy = Mathf.Clamp(currentEnergy + currentEnergyRechargeRate * Time.deltaTime, 0, currentMaxEnergy);
+                currentEnergy += currentEnergyRechargeRate * Time.deltaTime;
+                currentEnergy = Mathf.Min(currentEnergy, currentMaxEnergy);
             }
         }
     }
 
-private void HandleMovement()
-{
-    // 1. Calculate Standard Thrust (Input based)
-    float thrustAxis = thrustForwardInput - thrustBackwardInput;
-    Vector3 inputThrust = transform.forward * thrustAxis * currentAcceleration;
+    // ========================================================================
+    // MOVEMENT SYSTEM
+    // ========================================================================
 
-    // 2. Calculate Strafe (Input based)
-    Vector3 camUp = cameraTransform.up;
-    Vector3 camRight = cameraTransform.right;
-    
-    // Flatten camera vectors so looking down doesn't push us into the ground unexpectedly
-    // (Optional, but good for space shooters if you want "flat" strafing relative to view)
-    // Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * currentAcceleration; 
-    
-    // Your original strafe logic:
-    Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * currentAcceleration;
-
-    // 3. Apply Input Forces
-    // We apply these regardless of boosting. This lets you "steer" or "fight" the boost slightly.
-    rb.AddForce(inputThrust + strafeForce);
-
-    // 4. Handle Boosting (The New Logic)
-    float speedLimit = currentMaxSpeed; // Default limit
-
-    if (isBoosting)
+    private void HandleMovement()
     {
-        // A. Set the higher speed limit
-        speedLimit = currentMaxBoostSpeed;
+        // 1. Calculate thrust from forward/backward input
+        float thrustAxis = thrustForwardInput - thrustBackwardInput;
+        Vector3 inputThrust = transform.forward * thrustAxis * currentAcceleration;
 
-        // B. Apply CONSTANT forward force
-        // This runs even if 'thrustAxis' is 0. 
-        // Note: I used 'currentAcceleration' here, but you might want to create a 
-        // dedicated 'boostForce' variable in your Stats to make it punchier.
-        Vector3 constantBoostForce = transform.forward * currentBoostForce; 
-        
-        rb.AddForce(constantBoostForce);
+        // 2. Calculate strafe force (camera-relative)
+        Vector3 camUp = cameraTransform.up;
+        Vector3 camRight = cameraTransform.right;
+        Vector3 strafeForce = (camUp * moveInput.y + camRight * moveInput.x) * currentAcceleration;
+
+        // 3. Apply input forces
+        rb.AddForce(inputThrust + strafeForce);
+
+        // 4. Handle boost
+        float speedLimit = currentMaxSpeed;
+
+        if (isBoosting)
+        {
+            speedLimit = currentMaxBoostSpeed;
+
+            // Apply constant forward boost force
+            Vector3 boostForce = transform.forward * currentBoostForce;
+            rb.AddForce(boostForce);
+        }
+
+        // 5. Soft speed cap
+        if (rb.linearVelocity.magnitude > speedLimit)
+        {
+            rb.linearVelocity = rb.linearVelocity.normalized * speedLimit;
+        }
     }
 
-    // 5. Cap Speed (Soft cap)
-    // We use linearVelocity (Unity 6+) or velocity (Unity 5/2022)
-    if (rb.linearVelocity.magnitude > speedLimit)
-    {
-        rb.linearVelocity = rb.linearVelocity.normalized * speedLimit;
-    }
-}
+    // ========================================================================
+    // ROTATION SYSTEM
+    // ========================================================================
 
     private void HandleRotation()
     {
-        // Simple turning using torque
-        // Pitch (Up/Down) rotates around X axis
-        // Yaw (Left/Right) rotates around Y axis
-        Vector3 torque = new Vector3(lookInput.y * -1f, lookInput.x, 0) * currentTurnSpeed; // invert Y here if needed
-        
-        // Use AddRelativeTorque so it rotates based on where the ship is currently facing
+        // Pitch (up/down) and Yaw (left/right)
+        Vector3 torque = new Vector3(-lookInput.y, lookInput.x, 0) * currentTurnSpeed;
         rb.AddRelativeTorque(torque);
     }
 
-private void HandleStabilization()
-{
-    // 1. Check if we have any rotation input (Using the input variable we set up earlier)
-    // We check .sqrMagnitude because it's faster than .magnitude
-    bool isRotating = lookInput.sqrMagnitude > 0.01f;
+    // ========================================================================
+    // STABILIZATION SYSTEM (CAMERA-RELATIVE ROLL)
+    // ========================================================================
 
-    // 2. Check Speed
-    float currentSpeed = rb.linearVelocity.magnitude;
-    bool isMovingFast = currentSpeed > currentMaxSpeedForAutoLevel;
-
-    if (isRotating || isMovingFast)
+    /// <summary>
+    /// Auto-stabilizes ship roll to align with camera's up direction.
+    /// This keeps the ship "level" relative to the screen, not world up.
+    /// </summary>
+    private void HandleStabilization()
     {
-        // If we are rotating, reset the "Last Input Time" to right now
-        lastInputTime = Time.time;
-    }
-    else
-    {
-        // 2. We are NOT rotating. Check how much time has passed.
-        float timeSinceInput = Time.time - lastInputTime;
+        // 1. Check if player is actively rotating
+        bool isRotating = lookInput.sqrMagnitude > 0.01f;
 
-        if (timeSinceInput > currentAutoLevelDelay)
+        // 2. Check if moving too fast for stabilization
+        float currentSpeed = rb.linearVelocity.magnitude;
+        bool isMovingFast = currentSpeed > currentMaxSpeedForAutoLevel;
+
+        if (isRotating || isMovingFast)
         {
-            // 3. The Delay is over! Apply Stabilization.
-            
-            // Calculate the rotation needed to align 'up' with 'Vector3.up'
-            Quaternion targetRotation = Quaternion.FromToRotation(transform.up, Vector3.up);
-            
-            targetRotation.ToAngleAxis(out float angle, out Vector3 axis);
-
-            // Normalize angle to handle the -180 to 180 wrap-around
-            if (angle > 180) angle -= 360;
-
-            // Apply the Torque (Physics force) to gently rotate us back
-            // We use the same 'stabilizeSpeed' variable from your stats
-            rb.AddTorque(axis * (angle * currentAutoLevelSpeed * Mathf.Deg2Rad) - rb.angularVelocity);
+            // Reset timer while player has control
+            lastInputTime = Time.time;
+            return;
         }
-    }
-}
 
-     private void HandleBraking()
+        // 3. Check if delay has passed
+        float timeSinceInput = Time.time - lastInputTime;
+        if (timeSinceInput < currentAutoLevelDelay)
+        {
+            return;
+        }
+
+        // 4. Calculate roll correction to match camera up
+        // We want ship's up to align with camera's up (screen Y axis)
+        Vector3 shipUp = transform.up;
+        Vector3 cameraUp = cameraTransform.up;
+
+        // Project both vectors onto the plane perpendicular to ship's forward
+        Vector3 shipForward = transform.forward;
+        Vector3 projectedShipUp = Vector3.ProjectOnPlane(shipUp, shipForward).normalized;
+        Vector3 projectedCameraUp = Vector3.ProjectOnPlane(cameraUp, shipForward).normalized;
+
+        // Calculate the rotation needed to align projected up vectors
+        Quaternion targetRotation = Quaternion.FromToRotation(projectedShipUp, projectedCameraUp);
+        targetRotation.ToAngleAxis(out float angle, out Vector3 axis);
+
+        // Normalize angle to -180 to 180 range
+        if (angle > 180f) angle -= 360f;
+
+        // Apply torque only around the forward axis (roll only)
+        // We project the axis onto the forward direction to isolate roll
+        float rollComponent = Vector3.Dot(axis, shipForward);
+        Vector3 rollAxis = shipForward * rollComponent;
+
+        // Apply stabilization torque
+        Vector3 stabilizationTorque = rollAxis * (angle * currentAutoLevelSpeed * Mathf.Deg2Rad);
+        rb.AddTorque(stabilizationTorque - rb.angularVelocity * 0.5f); // Add damping
+    }
+
+    // ========================================================================
+    // BRAKING SYSTEM
+    // ========================================================================
+
+    private void HandleBraking()
     {
-        // If no input is detected, apply counter-force to stop sliding
-        bool noInput = moveInput.sqrMagnitude < 0.1f && Mathf.Abs(thrustForwardInput) < 0.1f && Mathf.Abs(thrustBackwardInput) < 0.1f;
+        // Check if no input is detected
+        bool noInput = moveInput.sqrMagnitude < 0.1f &&
+                      Mathf.Abs(thrustForwardInput) < 0.1f &&
+                      Mathf.Abs(thrustBackwardInput) < 0.1f;
 
         if (noInput)
         {
-            // Interpolate velocity towards zero
-            rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, Vector3.zero, currentBrakeStrength * Time.fixedDeltaTime);
-            
-            // Also kill rotation if joystick is let go
-            if(lookInput.sqrMagnitude < 0.1f)
+            // Brake linear velocity
+            rb.linearVelocity = Vector3.Lerp(
+                rb.linearVelocity,
+                Vector3.zero,
+                currentBrakeStrength * Time.fixedDeltaTime
+            );
+
+            // Brake angular velocity if not rotating
+            if (lookInput.sqrMagnitude < 0.1f)
             {
-                rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, currentBrakeStrength * Time.fixedDeltaTime);
+                rb.angularVelocity = Vector3.Lerp(
+                    rb.angularVelocity,
+                    Vector3.zero,
+                    currentBrakeStrength * Time.fixedDeltaTime
+                );
             }
         }
     }
 
+    // ========================================================================
+    // DODGE SYSTEM
+    // ========================================================================
+
     private void PerformDodge()
     {
-        // 1. Check if we have enough energy
-    if (currentEnergy < currentEnergyPerDodge)
-    {
-        // To be doing: Play a "failed" sound or flash UI here
-        return; 
-    }
+        // 1. Check energy cost
+        if (currentEnergy < currentEnergyPerDodge)
+        {
+            // TODO: Play failure sound/effect
+            return;
+        }
 
-        // 2. Pay the cost (Instant deduction)
+        // 2. Consume energy
         currentEnergy -= currentEnergyPerDodge;
-        lastEnergyUseTime = Time.time; // Update last use time
-        
-        // "B: Dodge, move fast toward curent input direction"
+        lastEnergyUseTime = Time.time;
+
+        // 3. Calculate dodge direction
         Vector3 dodgeDirection;
 
         if (moveInput.sqrMagnitude > 0.1f)
         {
-            // Directional Dodge: Use the same math as Strafe logic
+            // Directional dodge based on input
             Vector3 camUp = cameraTransform.up;
             Vector3 camRight = cameraTransform.right;
             dodgeDirection = (camUp * moveInput.y + camRight * moveInput.x).normalized;
         }
         else
         {
-            // "Phase/Spot Dodge": If no input, maybe jump UP or Backward? 
-            // Let's do a quick backward phase as a defensive maneuver
-            // Or you can make this Vector3.zero for just an invincibility frame logic (not physics)
-            dodgeDirection = transform.forward; // Spot dodge jumps "Forward" relative to ship
+            // Default forward dodge if no input
+            dodgeDirection = transform.forward;
         }
 
-        // Apply Impulse (Instant force, ignoring mass)
+        // 4. Apply impulse force
         rb.AddForce(dodgeDirection * currentDodgeForce, ForceMode.Impulse);
+
+        // TODO: Trigger dodge VFX/sound
+        // TODO: Add invincibility frames if desired
     }
-    
-    // Method to handle Explosions (Call this from your Bomb/Explosion script)
+
+    // ========================================================================
+    // PUBLIC UTILITY METHODS
+    // ========================================================================
+
+    /// <summary>
+    /// Applies an explosion force to the ship. Call from explosion scripts.
+    /// </summary>
     public void ApplyExplosion(Vector3 position, float force, float radius)
     {
         rb.AddExplosionForce(force, position, radius);
-        // This naturally creates the "pushing ship in opposite direction" effect
     }
 
-    #endregion
+    /// <summary>
+    /// Enables or disables braking system (useful for damage states).
+    /// </summary>
+    public void SetBrakingEnabled(bool enabled)
+    {
+        isBrakingEnabled = enabled;
+    }
+
+    /// <summary>
+    /// Gets current energy as a percentage (0-1).
+    /// </summary>
+    public float GetEnergyPercent()
+    {
+        return currentMaxEnergy > 0 ? currentEnergy / currentMaxEnergy : 0f;
+    }
+
+    /// <summary>
+    /// Gets current energy value.
+    /// </summary>
+    public float GetCurrentEnergy()
+    {
+        return currentEnergy;
+    }
+
+    /// <summary>
+    /// Checks if ship is currently boosting.
+    /// </summary>
+    public bool IsBoosting()
+    {
+        return isBoosting;
+    }
+
+    /// <summary>
+    /// Gets current speed as a percentage of max speed (0-1).
+    /// </summary>
+    public float GetSpeedPercent()
+    {
+        float currentSpeed = rb.linearVelocity.magnitude;
+        float maxPossibleSpeed = isBoosting ? currentMaxBoostSpeed : currentMaxSpeed;
+        return maxPossibleSpeed > 0 ? currentSpeed / maxPossibleSpeed : 0f;
+    }
+
+    /// <summary>
+    /// Applies a stat modifier (buff/debuff). Example: speed boost power-up.
+    /// </summary>
+    public void ApplySpeedModifier(float multiplier)
+    {
+        currentMaxSpeed *= multiplier;
+        currentMaxBoostSpeed *= multiplier;
+    }
+
+    /// <summary>
+    /// Restores energy to full (e.g., from pickup).
+    /// </summary>
+    public void RestoreEnergy(float amount)
+    {
+        currentEnergy = Mathf.Min(currentEnergy + amount, currentMaxEnergy);
+    }
 }
