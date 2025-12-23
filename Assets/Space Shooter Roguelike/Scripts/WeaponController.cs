@@ -472,7 +472,7 @@ public class WeaponController : MonoBehaviour
             if (lockedTargets.Count > 0)
             {
                 // Fire at each locked target
-                foreach (var targetData in lockedTargets)
+                foreach (var targetData in primaryTargets)
                 {
                     ProcessFire(targetData);
                 }
