@@ -78,7 +78,9 @@ public class WeaponController : MonoBehaviour
     // TARGETING STATE
     // ========================================================================
 
-    private class TargetTrackData
+    // Nested target tracking data used by the targeting system.
+    // Made public so public getters can return lists of this type without accessibility errors.
+    public class TargetTrackData
     {
         public Transform transform;
         public float lockTimer;
@@ -997,5 +999,14 @@ public class WeaponController : MonoBehaviour
             Gizmos.DrawWireSphere(t.predictedPos, 1f);
             Gizmos.DrawLine(t.transform.position, t.predictedPos);
         }
+    }
+    public List<TargetTrackData> GetActiveTargets()
+    {
+        return new List<TargetTrackData>(activeTargets);
+    }
+
+    public List<TargetTrackData> GetPrimaryTargets()
+    {
+        return new List<TargetTrackData>(primaryTargets);
     }
 }
