@@ -869,98 +869,105 @@ public class WeaponController : MonoBehaviour
     // ========================================================================
 
     private void HandleTargetingSystem()
+{
+    // 1. Remove destroyed/invalid targets
+    for (int i = activeTargets.Count - 1; i >= 0; i--)
     {
-        // 1. Remove destroyed targets
-        for (int i = activeTargets.Count - 1; i >= 0; i--)
+        if (activeTargets[i].transform == null || !activeTargets[i].transform.gameObject.activeInHierarchy)
         {
-            if (activeTargets[i].transform == null || !activeTargets[i].transform.gameObject.activeInHierarchy)
-            {
-                activeTargets.RemoveAt(i);
-            }
+            activeTargets.RemoveAt(i);
         }
+    }
 
-        // 2. Scan for potential targets
-        Collider[] potentialEnemies = Physics.OverlapSphere(transform.position, data.MaxLockDistance, EnemyLayer);
+    // 2. Scan for potential targets (Candidates)
+    Collider[] potentialEnemies = Physics.OverlapSphere(transform.position, data.MaxLockDistance, EnemyLayer);
 
-        foreach (Collider col in potentialEnemies)
+    foreach (Collider col in potentialEnemies)
+    {
+        Vector3 dirToEnemy = (col.transform.position - MainCamera.transform.position).normalized;
+        float angle = Vector3.Angle(MainCamera.transform.forward, dirToEnemy);
+
+        // Only checking FOV here, NOT the Count limit!
+        if (angle < 60f)
         {
-            // Check if in FOV
-            Vector3 dirToEnemy = (col.transform.position - MainCamera.transform.position).normalized;
-            float angle = Vector3.Angle(MainCamera.transform.forward, dirToEnemy);
+            TargetTrackData existingData = activeTargets.Find(x => x.transform == col.transform);
 
-            if (angle < 60f)
+            if (existingData == null)
             {
-                // Check if already tracking
-                TargetTrackData existingData = activeTargets.Find(x => x.transform == col.transform);
-
-                if (existingData == null)
+                // FIX: Removed the "if count < limit" check. 
+                // We track everyone visible so we can decide who is best later.
+                TargetTrackData newData = new TargetTrackData
                 {
-                    // Add new target if under limit
-                    if (activeTargets.Count < data.MaxLockTargets || data.MaxLockTargets == 1)
-                    {
-                        TargetTrackData newData = new TargetTrackData
-                        {
-                            transform = col.transform,
-                            lockTimer = 0,
-                            isLocked = false
-                        };
-                        activeTargets.Add(newData);
-                    }
-                }
+                    transform = col.transform,
+                    lockTimer = 0,
+                    isLocked = false
+                };
+                activeTargets.Add(newData);
             }
         }
+    }
 
-        // 3. Update tracked targets
-        for (int i = activeTargets.Count - 1; i >= 0; i--)
+    // 3. Clean up targets that left range/FOV
+    for (int i = activeTargets.Count - 1; i >= 0; i--)
+    {
+        var tData = activeTargets[i];
+        float dist = Vector3.Distance(transform.position, tData.transform.position);
+        Vector3 dir = (tData.transform.position - MainCamera.transform.position).normalized;
+        float ang = Vector3.Angle(MainCamera.transform.forward, dir);
+
+        if (dist > data.MaxLockDistance || ang > 65f)
         {
-            var tData = activeTargets[i];
+            activeTargets.RemoveAt(i);
+        }
+    }
 
-            // Check if still in range and FOV
-            float dist = Vector3.Distance(transform.position, tData.transform.position);
-            Vector3 dir = (tData.transform.position - MainCamera.transform.position).normalized;
-            float ang = Vector3.Angle(MainCamera.transform.forward, dir);
+    // 4. Find primary target (closest to crosshair)
+    // We do this BEFORE updating timers, so we know who to lock.
+    primaryTargets.Clear(); 
+    
+    Vector3 aimOrigin = MainCamera.transform.position;
+    Vector3 aimForward = (AimingObject.position - aimOrigin).normalized;
 
-            if (dist > data.MaxLockDistance || ang > 65f)
-            {
-                activeTargets.RemoveAt(i);
-                continue;
-            }
+    var sortedTargets = activeTargets
+        .Select(t => new { 
+            Target = t, 
+            Angle = Vector3.Angle(aimForward, (t.transform.position - aimOrigin).normalized) 
+        })
+        .Where(x => x.Angle < data.AssistConeAngle)
+        .OrderBy(x => x.Angle)
+        .Take(data.MaxLockTargets) // Only the best N targets get selected
+        .Select(x => x.Target)
+        .ToList();
 
-            // Update lock timer
+    primaryTargets.AddRange(sortedTargets);
+
+    // 5. Update Lock Timers (Logic Moved Here)
+    foreach (var tData in activeTargets)
+    {
+        // Only increase timer if this specific target is in the Primary list
+        if (primaryTargets.Contains(tData))
+        {
             tData.lockTimer += Time.deltaTime;
             if (tData.lockTimer >= data.LockOnTimeNeeded)
             {
                 tData.isLocked = true;
             }
-
-            // Update lead prediction
-            Rigidbody targetRb = tData.transform.GetComponent<Rigidbody>();
-            Vector3 targetVel = (targetRb != null) ? targetRb.linearVelocity : Vector3.zero;
-            float travelTime = dist / data.ProjectileSpeed;
-            tData.predictedPos = tData.transform.position + (targetVel * travelTime);
+        }
+        else
+        {
+            // If they are no longer primary, lose the lock (or decrease timer)
+            tData.lockTimer = 0f;
+            tData.isLocked = false;
         }
 
-        // 4. Find primary target (closest to crosshair)
-        primaryTargets.Clear(); // Clear previous primary targets
-        
-        Vector3 aimOrigin = MainCamera.transform.position; // Camera position
-        Vector3 aimForward = (AimingObject.position - aimOrigin).normalized; // Aim direction
-
-        // Use LINQ to sort targets by how close they are to center screen (Angle)
-        // We only take targets that are within the AssistConeAngle
-        var sortedTargets = activeTargets
-            .Select(t => new { 
-                Target = t, 
-                Angle = Vector3.Angle(aimForward, (t.transform.position - aimOrigin).normalized) 
-            })
-            .Where(x => x.Angle < data.AssistConeAngle) // Only consider targets inside the cone
-            .OrderBy(x => x.Angle) // Closest to center first
-            .Take(data.MaxLockTargets) // Take only the amount allowed by WeaponData
-            .Select(x => x.Target)
-            .ToList();
-
-        primaryTargets.AddRange(sortedTargets);
+        // Always update prediction
+        Rigidbody targetRb = tData.transform.GetComponent<Rigidbody>();
+        Vector3 targetVel = (targetRb != null) ? targetRb.linearVelocity : Vector3.zero;
+        float dist = Vector3.Distance(transform.position, tData.transform.position);
+        float travelTime = dist / data.ProjectileSpeed;
+        tData.predictedPos = tData.transform.position + (targetVel * travelTime);
     }
+}
 
     // ========================================================================
     // PUBLIC GETTERS (For UI)
