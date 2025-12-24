@@ -36,9 +36,9 @@ MonoBehaviour:
   LockOnTimeNeeded: 1
   MaxLockDistance: 200
   MaxLockTargets: 1
-  AssistConeAngle: 5
+  AssistConeAngle: 180
   IsHoming: 1
-  HomingTurnSpeed: 1000
+  HomingTurnSpeed: 500
   RicochetCount: 0
   RicochetLayers:
     serializedVersion: 2
