@@ -388,12 +388,27 @@ public class ShipController : MonoBehaviour
         // Calculate the angle between current wings and flat horizon wings
         float angleError = Vector3.SignedAngle(currentRight, idealRight, transform.forward);
 
-        // 4. Apply Torque
-        // We only apply torque along the Forward axis (Rolling)
-        Vector3 correctionTorque = transform.forward * (angleError * currentAutoLevelSpeed * Mathf.Deg2Rad);
+        // 1. Calculate how fast we WANT to be rotating right now.
+        // Proportional: Far away = fast, Close = slow.
+        float gain = 5f; // Controls how "snappy" it starts moving
+        float desiredRollSpeed = angleError * gain;
 
-        // Apply with damping
-        rb.AddTorque(correctionTorque - (rb.angularVelocity * 0.5f));
+        // 2. CLAMP that speed.
+        // This ensures we never ask the ship to roll faster than your limit.
+        // We assume 'currentAutoLevelSpeed' is your max degrees per second limit.
+        float maxSpeedRad = currentAutoLevelSpeed * Mathf.Deg2Rad; // Convert to radians if needed
+        desiredRollSpeed = Mathf.Clamp(desiredRollSpeed, -maxSpeedRad, maxSpeedRad);
+
+        // 3. Calculate the difference (Delta) between Desired Speed and Current Speed.
+        // We only care about the Roll axis (Forward).
+        float currentRollSpeed = Vector3.Dot(rb.angularVelocity, transform.forward);
+        float speedError = desiredRollSpeed - currentRollSpeed;
+
+        // 4. Apply Torque to fix the speed error
+        // 'torquePower' determines how strong the engines are (how fast they reach the desired speed)
+        float torquePower = 30f;
+
+        rb.AddTorque(transform.forward * speedError * torquePower);
     }
 
     // ========================================================================

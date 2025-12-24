@@ -18,7 +18,7 @@ MonoBehaviour:
   boostForce: 600
   brakeStrength: 0.6
   turnSpeed: 3.5
-  autoLevelSpeed: 0.5
+  autoLevelSpeed: 2
   autoLevelDelay: 2
   maxSpeedForAutoLevel: 10
   dodgeForce: 500
@@ -27,3 +27,11 @@ MonoBehaviour:
   energyDrainRate: 20
   energyRechargeRate: 10
   energyRechargeDelay: 2
+  maxShield: 100
+  shieldRegenRate: 5
+  shieldRegenDelay: 3
+  shieldPhysicalIntake: 0.5
+  maxArmor: 100
+  armorDamageIntake: 0.7
+  maxHealth: 100
+  healthEnergyIntake: 0.5

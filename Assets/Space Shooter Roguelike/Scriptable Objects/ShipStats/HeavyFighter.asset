@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   acceleration: 80
   maxSpeed: 50
-  maxBoostSpeed: 200
+  maxBoostSpeed: 180
   boostForce: 400
   brakeStrength: 0.8
   turnSpeed: 2
-  autoLevelSpeed: 0.5
+  autoLevelSpeed: 2
   autoLevelDelay: 2
   maxSpeedForAutoLevel: 10
   dodgeForce: 250
@@ -27,3 +27,11 @@ MonoBehaviour:
   energyDrainRate: 15
   energyRechargeRate: 20
   energyRechargeDelay: 2
+  maxShield: 100
+  shieldRegenRate: 5
+  shieldRegenDelay: 3
+  shieldPhysicalIntake: 0.5
+  maxArmor: 100
+  armorDamageIntake: 0.7
+  maxHealth: 100
+  healthEnergyIntake: 0.5
